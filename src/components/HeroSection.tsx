@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, ShieldCheck, MapPin, Search, Phone, MessageSquare, UserCheck, Heart, Zap, Flame, Play, Pause } from 'lucide-react';
+import { ArrowRight, ShieldCheck, MapPin, Search, Phone, MessageSquare, UserCheck, Heart, Zap, Flame } from 'lucide-react';
 import { HERO_SCENES } from '../data/heroScenes';
 
 interface HeroSectionProps {
@@ -21,7 +21,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const [activeCompanionIdx, setActiveCompanionIdx] = useState(0);
   const [callingState, setCallingState] = useState(false);
   const [internalSceneIdx, setInternalSceneIdx] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0);
 
   const currentSceneIndex = activeSceneIndex !== undefined ? activeSceneIndex : internalSceneIdx;
@@ -35,10 +34,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     }
   };
 
-  // Slideshow progress & auto-advance timer
+  // Slideshow progress & auto-advance timer: plays automatically and continuously
   useEffect(() => {
-    if (isPaused) return;
-
     const intervalTime = 4200; // 4.2 seconds per slide
     const tickTime = 50; // update progress every 50ms
     const step = (tickTime / intervalTime) * 100;
@@ -55,7 +52,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     }, tickTime);
 
     return () => clearInterval(timer);
-  }, [currentSceneIndex, isPaused, onSceneChange]);
+  }, [currentSceneIndex, onSceneChange]);
 
   const companions = [
     {
@@ -118,8 +115,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     <section 
       id="main-content"
       className="relative flex flex-col items-center text-center pt-28 md:pt-36 pb-20 px-4 sm:px-6 overflow-hidden border-b border-black/10 transition-colors duration-1000"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
     >
       {/* 1. Dynamic 8K Scene Background Slideshow */}
       <div 
@@ -225,8 +220,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             })}
           </div>
 
-          {/* Active Pricing & Slide Progress Sub-Bar */}
-          <div className="flex items-center justify-between mt-2.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-[11px] sm:text-xs text-white/90 font-sans shadow-sm">
+          {/* Active Pricing & Automatic Slide Progress Sub-Bar */}
+          <div className="flex items-center justify-between mt-2.5 px-3.5 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-[11px] sm:text-xs text-white/90 font-sans shadow-sm">
             <div className="flex items-center gap-2 truncate">
               <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
               <span className="font-bold text-white whitespace-nowrap">{activeScene.rate}</span>
@@ -238,20 +233,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <span className="text-[10px] font-mono text-white/60">
                 0{currentSceneIndex + 1} / 0{HERO_SCENES.length}
               </span>
-              <div className="w-12 sm:w-16 h-1.5 bg-white/20 rounded-full overflow-hidden">
+              <div className="w-14 sm:w-20 h-1.5 bg-white/20 rounded-full overflow-hidden">
                 <div 
                   className={`h-full bg-gradient-to-r ${activeScene.accentGradient} transition-all duration-75`}
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <button 
-                type="button" 
-                onClick={() => setIsPaused(!isPaused)} 
-                title={isPaused ? "Play slideshow" : "Pause slideshow"}
-                className="p-1 rounded-full text-white/70 hover:text-white transition"
-              >
-                {isPaused ? <Play className="w-2.5 h-2.5 fill-current" /> : <Pause className="w-2.5 h-2.5 fill-current" />}
-              </button>
             </div>
           </div>
         </div>
