@@ -42,10 +42,11 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
             {/* Brand Column */}
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center gap-2 text-[#1d1d1f] mb-3">
-                <div className="w-7 h-7 bg-[#1d1d1f] rounded-full flex items-center justify-center text-white font-bold text-xs">
-                  CK
-                </div>
-                <span className="font-bold text-sm tracking-tight">Click Karo Date Karo</span>
+                <img 
+                  src="/assets/brand_logo.png" 
+                  alt="Click Karo Date Karo" 
+                  className="h-10 w-auto object-contain"
+                />
               </div>
               <p className="mb-3 text-[11px] text-[#86868b] leading-relaxed">
                 India's #1 Social &amp; Lifestyle Support Platform. Safe, verified, consent-first companionship across 19,000+ pin codes.
@@ -73,8 +74,8 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
               <h4 className="text-[#1d1d1f] font-bold text-xs tracking-tight">
                 Platform
               </h4>
-              <a href="#coverage" className="hover:text-[#0071e3] transition">Interactive Simulator</a>
-              <a href="#coverage" className="hover:text-[#0071e3] transition">Pin Code Checker</a>
+              <a href="#launch-cities" className="hover:text-[#0071e3] transition">12 Launch Cities</a>
+              <a href="#launch-cities" className="hover:text-[#0071e3] transition">Pin Code Checker</a>
               <a href="#earnings" className="hover:text-[#0071e3] transition">Earnings Calculator</a>
               <a href="#pricing" className="hover:text-[#0071e3] transition">Membership Plans</a>
               <button onClick={onOpenBooking} className="hover:text-[#0071e3] transition text-left text-xs">Find a Companion</button>
@@ -109,12 +110,12 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
           {/* Bottom Copyright */}
           <div className="mt-12 pt-6 border-t border-pink-200/50 flex flex-col md:flex-row justify-between items-center gap-3 text-[11px] text-[#86868b]">
             <div>
-              Copyright &copy; 2025 Click Karo Date Karo (A unit of <strong className="text-[#1d1d1f] font-bold">SET INDIA BUSINESS PVT LTD</strong>). All rights reserved.
+              Copyright &copy; 2025 Click Karo Date Karo. All rights reserved.
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span>All 19,000+ Pin Codes Active</span>
+                <span>12 Launch Cities Active</span>
               </div>
               <span>&bull;</span>
               <span className="flex items-center gap-1">

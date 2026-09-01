@@ -3,6 +3,8 @@ export interface ServiceItem {
   title: string;
   subtitle: string;
   pricePerHour: number;
+  duration?: string;
+  priceFormatted?: string;
   originalPrice?: number;
   icon: string;
   emoji: string;
@@ -65,6 +67,18 @@ export interface PartnerFormData {
 }
 
 export type UserRole = 'seeker' | 'companion' | null;
+
+export interface SeekerProfile {
+  id: string;
+  name: string;
+  phone: string;
+  city: string;
+  pinCode: string;
+  avatarUrl: string;
+  membershipPlan: string;
+  subscriptionActive: boolean;
+  bookingsCount: number;
+}
 
 export interface CompanionProfile {
   id: string;

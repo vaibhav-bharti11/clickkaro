@@ -1,0 +1,133 @@
+export interface LaunchCity {
+  id: string;
+  name: string;
+  state: string;
+  status: 'Live Now' | 'Active';
+  activeCompanions: number;
+  featuredSpots: string[];
+  popularServices: string[];
+  popularPinCodes: string[];
+}
+
+export const LAUNCH_CITIES: LaunchCity[] = [
+  {
+    id: 'dehradun',
+    name: 'Dehradun',
+    state: 'Uttarakhand',
+    status: 'Live Now',
+    activeCompanions: 34,
+    featuredSpots: ['Rajpur Road', 'Paltan Bazaar', 'Mussoorie Foothills'],
+    popularServices: ['Travel Partner', 'Coffee Partner', 'Hangout'],
+    popularPinCodes: ['248001', '248009', '248003'],
+  },
+  {
+    id: 'delhi',
+    name: 'Delhi',
+    state: 'Delhi NCR',
+    status: 'Live Now',
+    activeCompanions: 128,
+    featuredSpots: ['Connaught Place', 'Hauz Khas Village', 'Select Citywalk'],
+    popularServices: ['Movie Partner', 'Lunch/Dinner', 'Clubbing'],
+    popularPinCodes: ['110001', '110016', '110017'],
+  },
+  {
+    id: 'gurgaon',
+    name: 'Gurgaon',
+    state: 'Haryana (NCR)',
+    status: 'Live Now',
+    activeCompanions: 86,
+    featuredSpots: ['Cyber Hub', 'Golf Course Road', 'Galleria Market'],
+    popularServices: ['Clubbing', 'Lunch/Dinner', 'Coffee Partner'],
+    popularPinCodes: ['122002', '122009', '122018'],
+  },
+  {
+    id: 'noida',
+    name: 'Noida',
+    state: 'Uttar Pradesh (NCR)',
+    status: 'Live Now',
+    activeCompanions: 72,
+    featuredSpots: ['Sector 18 DLF Mall', 'Sector 62', 'Advant Navis'],
+    popularServices: ['Coffee Partner', 'Movie Partner', 'Hangout'],
+    popularPinCodes: ['201301', '201307', '201309'],
+  },
+  {
+    id: 'chandigarh',
+    name: 'Chandigarh',
+    state: 'Punjab / Haryana',
+    status: 'Live Now',
+    activeCompanions: 54,
+    featuredSpots: ['Sector 17 Plaza', 'Sukhna Lake', 'Elante Mall'],
+    popularServices: ['Travel Partner', 'Hangout', 'Coffee Partner'],
+    popularPinCodes: ['160017', '160022', '160036'],
+  },
+  {
+    id: 'bangalore',
+    name: 'Bangalore',
+    state: 'Karnataka',
+    status: 'Live Now',
+    activeCompanions: 145,
+    featuredSpots: ['Indiranagar 100ft Rd', 'Koramangala', 'Church Street'],
+    popularServices: ['Coffee Partner', 'Clubbing', 'Lunch/Dinner'],
+    popularPinCodes: ['560038', '560034', '560001'],
+  },
+  {
+    id: 'meerut',
+    name: 'Meerut',
+    state: 'Uttar Pradesh',
+    status: 'Live Now',
+    activeCompanions: 28,
+    featuredSpots: ['Abu Lane', 'Modipuram', 'University Road'],
+    popularServices: ['Hangout', 'Coffee Partner', 'Movie Partner'],
+    popularPinCodes: ['250001', '250002', '250110'],
+  },
+  {
+    id: 'jaipur',
+    name: 'Jaipur',
+    state: 'Rajasthan',
+    status: 'Live Now',
+    activeCompanions: 64,
+    featuredSpots: ['C-Scheme Cafes', 'Hawa Mahal Circuit', 'Malviya Nagar'],
+    popularServices: ['Travel Partner', 'Coffee Partner', 'Lunch/Dinner'],
+    popularPinCodes: ['302001', '302017', '302015'],
+  },
+  {
+    id: 'indore',
+    name: 'Indore',
+    state: 'Madhya Pradesh',
+    status: 'Live Now',
+    activeCompanions: 48,
+    featuredSpots: ['Chappan Dukan', 'Vijay Nagar', 'Sarafa Night Bazaar'],
+    popularServices: ['Lunch/Dinner', 'Coffee Partner', 'Movie Partner'],
+    popularPinCodes: ['452001', '452010', '452016'],
+  },
+  {
+    id: 'mumbai',
+    name: 'Mumbai',
+    state: 'Maharashtra',
+    status: 'Live Now',
+    activeCompanions: 160,
+    featuredSpots: ['Bandra Linking Road', 'Juhu Beach Cafes', 'Colaba Causeway'],
+    popularServices: ['Clubbing', 'Movie Partner', 'Travel Partner'],
+    popularPinCodes: ['400050', '400049', '400001'],
+  },
+  {
+    id: 'ghaziabad',
+    name: 'Ghaziabad',
+    state: 'Uttar Pradesh (NCR)',
+    status: 'Live Now',
+    activeCompanions: 38,
+    featuredSpots: ['Indirapuram Habitat Centre', 'Raj Nagar DC', 'Vaishali'],
+    popularServices: ['Hangout', 'Lunch/Dinner', 'Coffee Partner'],
+    popularPinCodes: ['201014', '201010', '201012'],
+  },
+  {
+    id: 'lucknow',
+    name: 'Lucknow',
+    state: 'Uttar Pradesh',
+    status: 'Live Now',
+    activeCompanions: 52,
+    featuredSpots: ['Hazratganj Ganjing', 'Gomti Nagar Riverfront', 'Aliganj'],
+    popularServices: ['Travel Partner', 'Coffee Partner', 'Lunch/Dinner'],
+    popularPinCodes: ['226001', '226024', '226010'],
+  },
+];

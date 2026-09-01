@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { INITIAL_BOOKING_REQUESTS } from '../data/mockProfiles';
 import { BookingRequest } from '../types';
-import { TrendingUp, CheckCircle2, XCircle, Clock, ShieldCheck, ArrowLeft, Sparkles, MapPin, DollarSign, Calendar, AlertTriangle } from 'lucide-react';
+import { TrendingUp, CheckCircle2, XCircle, Clock, ShieldCheck, ArrowLeft, Sparkles, MapPin, DollarSign, Calendar, AlertTriangle, LogOut } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface CompanionDashboardProps {
   userName: string;
   onBackToHome: () => void;
   onSwitchToSeeker: () => void;
+  onLogout?: () => void;
 }
 
 export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
   userName,
   onBackToHome,
   onSwitchToSeeker,
+  onLogout,
 }) => {
   const [isOnline, setIsOnline] = useState(true);
   const [requests, setRequests] = useState<BookingRequest[]>(INITIAL_BOOKING_REQUESTS);
@@ -94,7 +96,40 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
             >
               Switch to Seeker Portal &rarr;
             </button>
+
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold px-3.5 py-2.5 rounded-full transition shadow-xs flex items-center gap-1.5 apple-focus"
+                title="Log Out of Portal"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Log Out</span>
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* Test Persona Notification Bar */}
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 rounded-2xl p-3.5 border border-emerald-200/80 mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="px-2.5 py-1 rounded-full bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-wider">
+              Test Companion Active
+            </span>
+            <span className="font-bold text-[#1d1d1f]">
+              Priya Sharma (Delhi NCR &bull; 100% KYC Verified)
+            </span>
+            <span className="hidden md:inline-block text-[#86868b]">&bull;</span>
+            <span className="hidden md:inline-block text-emerald-700 font-semibold">
+              80% Net Payout Active
+            </span>
+          </div>
+          <button
+            onClick={onSwitchToSeeker}
+            className="text-emerald-700 font-bold hover:underline flex items-center gap-1 shrink-0"
+          >
+            <span>Test as Seeker (Vaibhav Bharti) &rarr;</span>
+          </button>
         </div>
 
         {/* 1. FINANCIAL & EARNINGS METRICS GRID */}

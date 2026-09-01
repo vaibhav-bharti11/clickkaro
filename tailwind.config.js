@@ -8,28 +8,32 @@ export default {
     extend: {
       fontFamily: {
         'sans': [
+          '"Plus Jakarta Sans"',
           '-apple-system',
           'BlinkMacSystemFont',
           '"SF Pro Text"',
-          '"SF Pro Display"',
-          '"Segoe UI"',
-          'Roboto',
-          'Helvetica',
-          'Arial',
           'sans-serif',
         ],
         'display': [
+          '"Outfit"',
           '-apple-system',
           'BlinkMacSystemFont',
           '"SF Pro Display"',
-          '"SF Pro Text"',
-          '"Segoe UI"',
-          'Helvetica',
           'sans-serif',
         ],
-        'serif': ['Instrument Serif', 'Georgia', 'serif'],
       },
       colors: {
+        'vibrant': {
+          'pink': '#FF2D55',
+          'rose': '#F43F5E',
+          'purple': '#7928CA',
+          'indigo': '#6366F1',
+          'blue': '#0071E3',
+          'cyan': '#06B6D4',
+          'emerald': '#10B981',
+          'orange': '#FF5E3A',
+          'amber': '#F59E0B',
+        },
         'apple': {
           'blue': '#0071e3',
           'blue-hover': '#0077ed',
@@ -52,11 +56,17 @@ export default {
         'apple-md': '0 8px 24px rgba(0, 0, 0, 0.06)',
         'apple-lg': '0 20px 40px rgba(0, 0, 0, 0.08)',
         'apple-float': '0 30px 60px rgba(0, 0, 0, 0.12)',
+        'glow-pink': '0 0 50px rgba(255, 45, 85, 0.4)',
+        'glow-purple': '0 0 50px rgba(121, 40, 202, 0.4)',
+        'glow-blue': '0 0 50px rgba(0, 113, 227, 0.4)',
+        'glow-orange': '0 0 50px rgba(255, 94, 58, 0.4)',
       },
       animation: {
         'float': 'float 6s ease-in-out infinite',
         'float-delayed': 'float 6s ease-in-out 3s infinite',
         'pulse-subtle': 'pulseSubtle 3s ease-in-out infinite',
+        'shimmer': 'shimmer 2.5s infinite linear',
+        'spin-slow': 'spin 12s linear infinite',
       },
       keyframes: {
         float: {
@@ -66,6 +76,10 @@ export default {
         pulseSubtle: {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.75' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
         },
       },
     },

@@ -3,7 +3,7 @@ import { BackgroundVideo } from './components/BackgroundVideo';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { StatsBar } from './components/StatsBar';
-import { CoverageSection } from './components/CoverageSection';
+import { LaunchCitiesSection } from './components/LaunchCitiesSection';
 import { ServicesSection } from './components/ServicesSection';
 import { WhyChooseUs } from './components/WhyChooseUs';
 import { SuccessStories } from './components/SuccessStories';
@@ -20,23 +20,36 @@ import { ServiceItem, UserRole, CompanionProfile } from './types';
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'landing' | 'seeker' | 'companion'>('landing');
-  const [userRole, setUserRole] = useState<UserRole>(null);
-  const [userName, setUserName] = useState<string>('');
+  const [userRole, setUserRole] = useState<UserRole>('seeker');
+  const [userName, setUserName] = useState<string>('vaibhav');
+  const [userAvatar, setUserAvatar] = useState<string>(() => {
+    return localStorage.getItem('ck_user_avatar') || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80';
+  });
   
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signup');
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
+  const [activeHeroSceneIndex, setActiveHeroSceneIndex] = useState(0);
 
   const handleOpenAuth = (mode: 'signin' | 'signup' = 'signup') => {
     setAuthModalMode(mode);
     setAuthModalOpen(true);
   };
 
-  const handleRoleSelected = (role: UserRole, name: string) => {
+  const handleUpdateAvatar = (newAvatar: string) => {
+    setUserAvatar(newAvatar);
+    localStorage.setItem('ck_user_avatar', newAvatar);
+  };
+
+  const handleRoleSelected = (role: UserRole, name: string, avatarUrl?: string) => {
     setUserRole(role);
-    setUserName(name || 'Rahul Sharma');
+    setUserName(name || 'vaibhav');
+    if (avatarUrl) {
+      setUserAvatar(avatarUrl);
+      localStorage.setItem('ck_user_avatar', avatarUrl);
+    }
     if (role === 'seeker') {
       setCurrentView('seeker');
     } else if (role === 'companion') {
@@ -51,15 +64,24 @@ export const App: React.FC = () => {
     } else {
       if (!userRole) {
         setUserRole(mode);
-        if (!userName) setUserName('Rahul Sharma');
+        if (!userName) setUserName('vaibhav');
       }
       setCurrentView(mode);
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleOpenBooking = (service?: ServiceItem) => {
-    if (service) {
+  const handleLogout = () => {
+    setUserRole(null);
+    setUserName('');
+    localStorage.removeItem('ck_user_role');
+    localStorage.removeItem('ck_user_name');
+    setCurrentView('landing');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenBooking = (service?: ServiceItem | string) => {
+    if (typeof service === 'object' && service !== null) {
       setSelectedService(service);
     }
     setBookingModalOpen(true);
@@ -85,9 +107,9 @@ export const App: React.FC = () => {
   };
 
   const handleQuickSearch = (_query: string) => {
-    const coverageEl = document.getElementById('coverage');
-    if (coverageEl) {
-      coverageEl.scrollIntoView({ behavior: 'smooth' });
+    const citiesEl = document.getElementById('launch-cities');
+    if (citiesEl) {
+      citiesEl.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
@@ -111,6 +133,9 @@ export const App: React.FC = () => {
         onOpenAuth={handleOpenAuth}
         currentRole={userRole}
         userName={userName}
+        userAvatar={userAvatar}
+        onUpdateAvatar={handleUpdateAvatar}
+        onLogout={handleLogout}
         currentView={currentView}
         onSwitchMode={handleSwitchMode}
       />
@@ -118,19 +143,21 @@ export const App: React.FC = () => {
       {/* VIEW 1: SEEKER SWIPE DASHBOARD */}
       {currentView === 'seeker' && (
         <SeekerDashboard 
-          userName={userName || 'Rahul'}
+          userName={userName || 'vaibhav'}
           onBackToHome={() => { setCurrentView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           onSwitchToCompanion={() => { setUserRole('companion'); setCurrentView('companion'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           onBookCompanion={handleBookFromCompanionCard}
+          onLogout={handleLogout}
         />
       )}
 
       {/* VIEW 2: COMPANION EARNINGS & REQUESTS DASHBOARD */}
       {currentView === 'companion' && (
         <CompanionDashboard 
-          userName={userName || 'Priya Sharma'}
+          userName="Priya Sharma"
           onBackToHome={() => { setCurrentView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           onSwitchToSeeker={() => { setUserRole('seeker'); setCurrentView('seeker'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onLogout={handleLogout}
         />
       )}
 
@@ -139,42 +166,44 @@ export const App: React.FC = () => {
         <main>
           {/* 1. Hero Section with Kinetic Headline & Live Floating Pill */}
           <HeroSection 
+            activeSceneIndex={activeHeroSceneIndex}
+            onSceneChange={setActiveHeroSceneIndex}
             onOpenBooking={() => handleOpenBooking()}
             onOpenPartnerJoin={handleOpenPartnerJoin}
             onQuickSearch={handleQuickSearch}
           />
 
-          {/* 2. Stats Bar */}
-          <StatsBar />
-
-          {/* 3. Coverage Across India & Dual-Panel Niche Simulator */}
-          <CoverageSection 
-            onOpenBooking={() => handleOpenBooking()}
+          {/* 2. Official 12 Launch Cities (Client Note: Dehradun, Delhi, Gurgaon, Noida, Bangalore, Mumbai, etc.) */}
+          <LaunchCitiesSection 
+            onOpenBooking={(cityName) => handleOpenBooking(cityName)}
           />
 
-          {/* 4. Complete Services Catalog (16 Services) */}
+          {/* 3. Complete Services Catalog (including Travel Partner ₹14,999/12h & Coffee Partner ₹1,999/1h) */}
           <ServicesSection 
             onSelectService={(service) => handleOpenBooking(service)}
           />
 
-          {/* 5. Why Choose Us (Sticky Side-Nav Trust Blueprint) */}
+          {/* 4. Why Choose Us (Sticky Side-Nav Trust Blueprint) */}
           <WhyChooseUs />
 
-          {/* 6. Success Stories & Real Earnings */}
+          {/* 5. Success Stories & Real Earnings */}
           <SuccessStories 
             onOpenPartnerJoin={handleOpenPartnerJoin}
           />
 
-          {/* 7. Earning Opportunity & Interactive Calculator */}
+          {/* 6. Earning Opportunity & Interactive Calculator */}
           <EarningsCalculator 
             onOpenPartnerJoin={handleOpenPartnerJoin}
           />
 
-          {/* 8. Pricing Section (Clients & Partner 60% OFF plans) */}
+          {/* 7. Pricing Section with Official ₹999 / 3 Months Subscription */}
           <PricingSection 
             onOpenBooking={() => handleOpenBooking()}
             onOpenPartnerJoin={handleOpenPartnerJoin}
           />
+
+          {/* 8. Millions Registered Section - MOVED TO BOTTOM ABOVE FAQS AS REQUESTED */}
+          <StatsBar />
 
           {/* 9. FAQs Accordion */}
           <FaqSection 

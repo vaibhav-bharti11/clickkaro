@@ -15,7 +15,7 @@ export const BackgroundVideo: React.FC = () => {
       {/* 2. Layered Baby Pink Pastel Gradient Mesh */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#FFF0F5]/90 via-[#FFE4E8]/80 to-[#FDF2F8]/95" />
 
-      {/* 3. Cinematic Ambient Glowing Aurora Orbs (Simulating Video Fluidity) */}
+      {/* 3. Cinematic Ambient Glowing Aurora Orbs */}
       <div 
         className="absolute -top-[20%] -left-[10%] w-[70vw] h-[70vw] rounded-full bg-gradient-to-tr from-[#FFD1DC]/60 to-[#FFF0F5]/20 blur-[120px] animate-float opacity-75" 
       />

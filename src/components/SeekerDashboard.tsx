@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { MOCK_COMPANIONS } from '../data/mockProfiles';
 import { CompanionProfile } from '../types';
-import { MapPin, Search, Star, ShieldCheck, Heart, ArrowLeft, X, Sparkles, CheckCircle2 } from 'lucide-react';
+import { MapPin, Search, Star, ShieldCheck, Heart, ArrowLeft, X, Sparkles, CheckCircle2, LogOut } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface SeekerDashboardProps {
@@ -9,6 +9,7 @@ interface SeekerDashboardProps {
   onBackToHome: () => void;
   onSwitchToCompanion: () => void;
   onBookCompanion: (companion: CompanionProfile) => void;
+  onLogout?: () => void;
 }
 
 export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
@@ -16,6 +17,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
   onBackToHome,
   onSwitchToCompanion,
   onBookCompanion,
+  onLogout,
 }) => {
   const [selectedCity, setSelectedCity] = useState('Delhi NCR');
   const [selectedPinCode, setSelectedPinCode] = useState('');
@@ -25,16 +27,30 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
   const [viewMode, setViewMode] = useState<'swipe' | 'grid'>('swipe');
   const [matchedAnimation, setMatchedAnimation] = useState<string | null>(null);
 
-  const cities = ['All India', 'Delhi NCR', 'Mumbai', 'Bengaluru', 'Pune', 'Kolkata', 'Hyderabad'];
+  const cities = [
+    'All India',
+    'Delhi NCR',
+    'Mumbai',
+    'Bangalore',
+    'Gurgaon',
+    'Noida',
+    'Chandigarh',
+    'Jaipur',
+    'Dehradun',
+    'Indore',
+    'Lucknow',
+    'Meerut',
+    'Ghaziabad',
+  ];
 
   const categories = [
-    { id: 'all', label: 'All Services' },
-    { id: 'movie-partner', label: '🎬 Movies' },
-    { id: 'elder-care', label: '👴 Elder Care' },
-    { id: 'coffee-partner', label: '☕ Cafes' },
-    { id: 'clubbing', label: '🎉 Nightlife' },
-    { id: 'shopping-buddy', label: '🛍️ Shopping' },
-    { id: 'travel-partner', label: '✈️ Travel' },
+    { id: 'all', label: 'All 6 Services' },
+    { id: 'hangout', label: 'Hangout (4 hrs)' },
+    { id: 'movie-partner', label: 'Movie Partner (4 hrs)' },
+    { id: 'clubbing', label: 'Clubbing (6 hrs)' },
+    { id: 'lunch-dinner', label: 'Lunch/Dinner (2 hrs)' },
+    { id: 'travel-partner', label: 'Travel Partner (12 hrs)' },
+    { id: 'coffee-partner', label: 'Coffee Partner (1 hr)' },
   ];
 
   const filteredCompanions = useMemo(() => {
@@ -129,7 +145,40 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
             >
               Switch to Partner Mode &rarr;
             </button>
+
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold px-3.5 py-2 rounded-full transition shadow-xs flex items-center gap-1.5 apple-focus"
+                title="Log Out of Portal"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Log Out</span>
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* Test Persona Notification Bar */}
+        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-pink-50 rounded-2xl p-3.5 border border-blue-200/80 mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="px-2.5 py-1 rounded-full bg-[#0071E3] text-white font-bold text-[10px] uppercase tracking-wider">
+              Test Seeker Active
+            </span>
+            <span className="font-bold text-[#1d1d1f]">
+              Vaibhav Bharti (Delhi &bull; PIN 110001)
+            </span>
+            <span className="hidden md:inline-block text-[#86868b]">&bull;</span>
+            <span className="hidden md:inline-block text-emerald-700 font-semibold">
+              3 Months Pass Active (₹999)
+            </span>
+          </div>
+          <button
+            onClick={onSwitchToCompanion}
+            className="text-[#0071E3] font-bold hover:underline flex items-center gap-1 shrink-0"
+          >
+            <span>Test as Companion (Priya Sharma) &rarr;</span>
+          </button>
         </div>
 
         {/* 1. Location & Category Control Bar */}

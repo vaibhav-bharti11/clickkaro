@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ALL_SERVICES, MEMBERSHIP_PLANS } from '../data/servicesData';
+import { LAUNCH_CITIES } from '../data/launchCities';
+import { validatePincode } from '../utils/pincodeValidator';
 import { ServiceItem } from '../types';
-import { X, CheckCircle2, ShieldCheck, Sparkles, MapPin, Calendar, Clock, Phone, User, Mail, ArrowRight } from 'lucide-react';
+import { X, CheckCircle2, ShieldCheck, Sparkles, MapPin, Calendar, Clock, Phone, User, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface BookingModalProps {
@@ -16,6 +18,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, ini
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
   const [pinCode, setPinCode] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pinSuccess, setPinSuccess] = useState<string | null>(null);
   const [date, setDate] = useState('');
   const [hours, setHours] = useState<number>(2);
   const [submitted, setSubmitted] = useState(false);
@@ -31,8 +35,37 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, ini
   const currentService = ALL_SERVICES.find((s) => s.id === selectedServiceId) || ALL_SERVICES[0];
   const totalPrice = currentService.pricePerHour * hours;
 
+  const handlePincodeChange = (value: string) => {
+    const cleaned = value.replace(/\D/g, '').slice(0, 6);
+    setPinCode(cleaned);
+
+    if (cleaned.length === 6) {
+      const res = validatePincode(cleaned);
+      if (res.isLaunchCity) {
+        setPinError(null);
+        setPinSuccess(`Live in ${res.cityName}! Verified companions available.`);
+        if (res.cityName) {
+          setCity(res.cityName);
+        }
+      } else {
+        setPinSuccess(null);
+        setPinError(`PIN ${cleaned} is outside our 12 launch cities. We currently operate exclusively in: Dehradun, Delhi, Gurgaon, Noida, Chandigarh, Bangalore, Meerut, Jaipur, Indore, Mumbai, Ghaziabad, and Lucknow.`);
+      }
+    } else {
+      setPinError(null);
+      setPinSuccess(null);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (pinCode.length === 6) {
+      const res = validatePincode(pinCode);
+      if (!res.isLaunchCity) {
+        setPinError(`Booking unavailable: PIN code ${pinCode} is outside our 12 launch cities.`);
+        return;
+      }
+    }
     setSubmitted(true);
     confetti({
       particleCount: 70,
@@ -89,7 +122,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, ini
                 >
                   {ALL_SERVICES.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.emoji} {s.title} — ₹{s.pricePerHour}/hr
+                      {s.emoji} {s.title} — {s.priceFormatted || `₹${s.pricePerHour}`}
                     </option>
                   ))}
                 </select>
@@ -135,41 +168,63 @@ export const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, ini
                 </div>
               </div>
 
-              {/* City & Pin Code */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="booking-city" className="block text-xs font-semibold text-[#1d1d1f] mb-1">
-                    City
-                  </label>
-                  <div className="relative">
-                    <MapPin className="w-4 h-4 text-[#86868b] absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+              {/* City & Pin Code (Strictly 12 Launch Cities) */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="booking-city" className="block text-xs font-semibold text-[#1d1d1f] mb-1">
+                      Launch City
+                    </label>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 text-[#86868b] absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+                      <select
+                        id="booking-city"
+                        required
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="w-full bg-[#f5f5f7] border border-black/[0.06] rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+                      >
+                        <option value="">Select an active city...</option>
+                        {LAUNCH_CITIES.map((c) => (
+                          <option key={c.id} value={c.name}>
+                            {c.name} ({c.state})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="booking-pincode" className="block text-xs font-semibold text-[#1d1d1f] mb-1">
+                      6-Digit Pin Code
+                    </label>
                     <input
-                      id="booking-city"
+                      id="booking-pincode"
                       type="text"
                       required
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      placeholder="e.g. New Delhi"
-                      className="w-full bg-[#f5f5f7] border border-black/[0.06] rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+                      maxLength={6}
+                      value={pinCode}
+                      onChange={(e) => handlePincodeChange(e.target.value)}
+                      placeholder="e.g. 110001"
+                      className={`w-full bg-[#f5f5f7] border rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 transition ${
+                        pinError ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/50' : pinSuccess ? 'border-emerald-400 focus:ring-emerald-500 bg-emerald-50/50' : 'border-black/[0.06] focus:ring-[#0071e3]'
+                      }`}
                     />
                   </div>
                 </div>
-                <div>
-                  <label htmlFor="booking-pincode" className="block text-xs font-semibold text-[#1d1d1f] mb-1">
-                    6-Digit Pin Code
-                  </label>
-                  <input
-                    id="booking-pincode"
-                    type="text"
-                    required
-                    maxLength={6}
-                    pattern="[0-9]{6}"
-                    value={pinCode}
-                    onChange={(e) => setPinCode(e.target.value)}
-                    placeholder="e.g. 110001"
-                    className="w-full bg-[#f5f5f7] border border-black/[0.06] rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
-                  />
-                </div>
+
+                {/* Live PIN Feedback */}
+                {pinSuccess && (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{pinSuccess}</span>
+                  </div>
+                )}
+                {pinError && (
+                  <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                    <span>{pinError}</span>
+                  </div>
+                )}
               </div>
 
               {/* Date & Duration */}
