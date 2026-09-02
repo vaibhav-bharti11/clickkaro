@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
-import { INITIAL_BOOKING_REQUESTS } from '../data/mockProfiles';
+import React, { useState, useEffect, useRef } from 'react';
 import { BookingRequest } from '../types';
-import { TrendingUp, CheckCircle2, XCircle, Clock, ShieldCheck, ArrowLeft, Sparkles, MapPin, DollarSign, Calendar, AlertTriangle, LogOut } from 'lucide-react';
+import { TrendingUp, CheckCircle2, XCircle, Clock, ShieldCheck, ArrowLeft, Sparkles, MapPin, DollarSign, Calendar, AlertTriangle, LogOut, Camera, Plus, Trash2, Image as ImageIcon } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { fetchCompanionRequestsFromSupabase, updateBookingStatusInSupabase, updateUserAvatarInSupabase } from '../services/supabase';
 
 interface CompanionDashboardProps {
   userName: string;
+  userAvatar?: string;
+  onUpdateAvatar?: (url: string) => void;
   onBackToHome: () => void;
   onSwitchToSeeker: () => void;
   onLogout?: () => void;
@@ -13,26 +15,132 @@ interface CompanionDashboardProps {
 
 export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
   userName,
+  userAvatar,
+  onUpdateAvatar,
   onBackToHome,
   onSwitchToSeeker,
   onLogout,
 }) => {
   const [isOnline, setIsOnline] = useState(true);
-  const [requests, setRequests] = useState<BookingRequest[]>(INITIAL_BOOKING_REQUESTS);
+  const [requests, setRequests] = useState<BookingRequest[]>([]);
   const [sosActive, setSosActive] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  
+  // Gallery state for portfolio photos
+  const [gallery, setGallery] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('ck_companion_gallery');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const dpInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDpUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        if (typeof reader.result === 'string') {
+          const newUrl = reader.result;
+          if (onUpdateAvatar) onUpdateAvatar(newUrl);
+          localStorage.setItem('ck_user_avatar', newUrl);
+          const phone = localStorage.getItem('ck_user_phone') || undefined;
+          const email = localStorage.getItem('ck_user_email') || undefined;
+          await updateUserAvatarInSupabase(newUrl, { phone, email, name: userName });
+          confetti({
+            particleCount: 40,
+            spread: 50,
+            origin: { y: 0.3 }
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          const updated = [...gallery, reader.result];
+          setGallery(updated);
+          localStorage.setItem('ck_companion_gallery', JSON.stringify(updated));
+          confetti({
+            particleCount: 30,
+            spread: 40,
+            origin: { y: 0.5 }
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveGalleryImage = (idx: number) => {
+    const updated = gallery.filter((_, i) => i !== idx);
+    setGallery(updated);
+    localStorage.setItem('ck_companion_gallery', JSON.stringify(updated));
+  };
+
+  const loadRequests = async () => {
+    try {
+      const dbBookings = await fetchCompanionRequestsFromSupabase(userName);
+
+      if (dbBookings && dbBookings.length > 0) {
+        const mapped: BookingRequest[] = dbBookings.map((b) => ({
+          id: b.id,
+          seekerName: b.client_name,
+          seekerPhone: b.client_phone || 'Protected',
+          serviceTitle: b.service_title,
+          date: b.booking_date,
+          time: 'Scheduled Slot',
+          hours: b.hours,
+          location: b.city,
+          pinCode: b.pin_code,
+          totalEarnings: Number(b.total_price),
+          netPayout: Math.round(Number(b.total_price) * 0.8),
+          status: (b.status === 'confirmed' ? 'accepted' : b.status === 'cancelled' ? 'declined' : 'pending') as any,
+          createdAt: new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }));
+        setRequests(mapped);
+      } else {
+        setRequests([]);
+      }
+    } catch (e) {
+      console.warn('[Companion Dashboard] Error loading requests:', e);
+    } finally {
+      setInitialLoaded(true);
+    }
+  };
+
+  useEffect(() => {
+    loadRequests();
+    const interval = setInterval(() => {
+      loadRequests();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [userName]);
 
   const pendingRequests = requests.filter((r) => r.status === 'pending');
   const acceptedBookings = requests.filter((r) => r.status === 'accepted');
 
-  const totalEarnings = 48200;
-  const weeklyPayout = 12800;
-  const completedHours = 24.5;
-  const partnerRating = 4.98;
+  // Real client earnings calculation (strictly 0 for new companions until bookings are accepted)
+  const totalEarnings = acceptedBookings.reduce((sum, r) => sum + r.netPayout, 0);
+  const weeklyPayout = acceptedBookings.reduce((sum, r) => sum + r.netPayout, 0);
+  const completedHours = acceptedBookings.reduce((sum, r) => sum + r.hours, 0);
+  const partnerRating = acceptedBookings.length > 0 ? '5.0 ★' : 'New Partner';
 
-  const handleAcceptRequest = (id: string) => {
+  const handleAcceptRequest = async (id: string) => {
     setRequests((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: 'accepted' as const } : r))
     );
+    await updateBookingStatusInSupabase(id, 'confirmed');
     confetti({
       particleCount: 60,
       spread: 60,
@@ -40,10 +148,11 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
     });
   };
 
-  const handleDeclineRequest = (id: string) => {
+  const handleDeclineRequest = async (id: string) => {
     setRequests((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: 'declined' as const } : r))
     );
+    await updateBookingStatusInSupabase(id, 'cancelled');
   };
 
   return (
@@ -52,7 +161,7 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
         
         {/* Top Header */}
         <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-5 sm:p-6 border border-pink-200 shadow-apple-md mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <button
               onClick={onBackToHome}
               aria-label="Back to landing page"
@@ -60,6 +169,33 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
+
+            {/* Companion Primary Profile Photo with Camera Upload */}
+            <div className="relative group">
+              <div className="w-13 h-13 rounded-full overflow-hidden ring-2 ring-emerald-300 shadow-sm bg-emerald-50">
+                <img 
+                  src={userAvatar || localStorage.getItem('ck_user_avatar') || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'} 
+                  alt={userName} 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => dpInputRef.current?.click()}
+                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white flex items-center justify-center shadow-md ring-2 ring-white transition active:scale-95 cursor-pointer"
+                title="Upload Profile Picture"
+              >
+                <Camera className="w-3 h-3" />
+              </button>
+              <input
+                ref={dpInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleDpUpload}
+              />
+            </div>
+
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-bold text-[#1d1d1f]">
@@ -69,7 +205,7 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
                   80% Payout Active
                 </span>
               </div>
-              <p className="text-xs text-[#86868b]">Manage client bookings, incoming requests &amp; bank settlements</p>
+              <p className="text-xs text-[#86868b]">Manage client bookings, incoming requests &amp; earnings</p>
             </div>
           </div>
 
@@ -94,7 +230,7 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
               onClick={onSwitchToSeeker}
               className="bg-[#1d1d1f] hover:bg-[#0071e3] text-white text-xs font-bold px-4 py-2.5 rounded-full transition shadow-sm apple-focus"
             >
-              Switch to Seeker Portal &rarr;
+              Switch to Seeker &rarr;
             </button>
 
             {onLogout && (
@@ -110,95 +246,147 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
           </div>
         </div>
 
-        {/* Test Persona Notification Bar */}
-        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 rounded-2xl p-3.5 border border-emerald-200/80 mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <span className="px-2.5 py-1 rounded-full bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-wider">
-              Test Companion Active
-            </span>
-            <span className="font-bold text-[#1d1d1f]">
-              Priya Sharma (Delhi NCR &bull; 100% KYC Verified)
-            </span>
-            <span className="hidden md:inline-block text-[#86868b]">&bull;</span>
-            <span className="hidden md:inline-block text-emerald-700 font-semibold">
-              80% Net Payout Active
-            </span>
-          </div>
+        {/* SOS Emergency Button */}
+        <div className="mb-6 flex justify-end">
           <button
-            onClick={onSwitchToSeeker}
-            className="text-emerald-700 font-bold hover:underline flex items-center gap-1 shrink-0"
+            onClick={() => setSosActive(!sosActive)}
+            className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 shadow-sm ${
+              sosActive
+                ? 'bg-red-600 text-white animate-pulse'
+                : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+            }`}
           >
-            <span>Test as Seeker (Vaibhav Bharti) &rarr;</span>
+            <AlertTriangle className="w-4 h-4" />
+            <span>{sosActive ? '🚨 Emergency Concierge Alert Dispatched' : '24/7 Companion SOS Guard'}</span>
           </button>
         </div>
 
-        {/* 1. FINANCIAL & EARNINGS METRICS GRID */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          
-          {/* Total Net Earnings */}
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-pink-200/80 shadow-sm">
-            <div className="flex justify-between items-start mb-3">
-              <span className="text-xs font-bold text-[#86868b] uppercase tracking-wider">Total Net (80%)</span>
-              <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <TrendingUp className="w-4 h-4" />
-              </div>
+        {/* 1. EARNINGS & PERFORMANCE METRICS (REAL LIVE METRICS) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 border border-pink-200 shadow-sm">
+            <div className="flex items-center justify-between text-xs text-[#86868b] mb-2">
+              <span>Total Net Earnings</span>
+              <DollarSign className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="text-3xl sm:text-4xl font-bold text-[#1d1d1f] mb-1 tabular-numbers">
+            <div className="text-2xl sm:text-3xl font-bold text-[#1d1d1f] font-display tabular-numbers">
               ₹{totalEarnings.toLocaleString('en-IN')}
             </div>
-            <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Direct Net Take-Home
-            </p>
+            <div className="text-[10px] text-emerald-600 font-bold mt-1 flex items-center gap-1">
+              <TrendingUp className="w-3 h-3" /> 80% Net Rate
+            </div>
           </div>
 
-          {/* Weekly Payout Scheduled */}
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-pink-200/80 shadow-sm">
-            <div className="flex justify-between items-start mb-3">
-              <span className="text-xs font-bold text-[#86868b] uppercase tracking-wider">Weekly Settlement</span>
-              <div className="w-8 h-8 rounded-full bg-blue-50 text-[#0071e3] flex items-center justify-center">
-                <DollarSign className="w-4 h-4" />
-              </div>
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 border border-pink-200 shadow-sm">
+            <div className="flex items-center justify-between text-xs text-[#86868b] mb-2">
+              <span>Weekly Settlement</span>
+              <Calendar className="w-4 h-4 text-[#0071e3]" />
             </div>
-            <div className="text-3xl sm:text-4xl font-bold text-[#0071e3] mb-1 tabular-numbers">
+            <div className="text-2xl sm:text-3xl font-bold text-[#1d1d1f] font-display tabular-numbers">
               ₹{weeklyPayout.toLocaleString('en-IN')}
             </div>
-            <p className="text-[11px] text-[#86868b]">
-              Bank Transfer on Friday
-            </p>
+            <div className="text-[10px] text-[#86868b] font-bold mt-1">
+              {weeklyPayout > 0 ? 'Auto-disbursed Tuesday' : 'Pending accepted bookings'}
+            </div>
           </div>
 
-          {/* Completed Hours */}
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-pink-200/80 shadow-sm">
-            <div className="flex justify-between items-start mb-3">
-              <span className="text-xs font-bold text-[#86868b] uppercase tracking-wider">Session Hours</span>
-              <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
-                <Clock className="w-4 h-4" />
-              </div>
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 border border-pink-200 shadow-sm">
+            <div className="flex items-center justify-between text-xs text-[#86868b] mb-2">
+              <span>Completed Hours</span>
+              <Clock className="w-4 h-4 text-amber-500" />
             </div>
-            <div className="text-3xl sm:text-4xl font-bold text-[#1d1d1f] mb-1 tabular-numbers">
+            <div className="text-2xl sm:text-3xl font-bold text-[#1d1d1f] font-display tabular-numbers">
               {completedHours} hrs
             </div>
-            <p className="text-[11px] text-[#86868b]">
-              12 Completed Meetups
-            </p>
+            <div className="text-[10px] text-[#86868b] font-bold mt-1">
+              This month
+            </div>
           </div>
 
-          {/* Partner Rating & Membership */}
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-pink-200/80 shadow-sm">
-            <div className="flex justify-between items-start mb-3">
-              <span className="text-xs font-bold text-[#86868b] uppercase tracking-wider">Rating &amp; Pass</span>
-              <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
-                <Sparkles className="w-4 h-4" />
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 border border-pink-200 shadow-sm">
+            <div className="flex items-center justify-between text-xs text-[#86868b] mb-2">
+              <span>Partner Rating</span>
+              <Sparkles className="w-4 h-4 text-pink-600" />
+            </div>
+            <div className="text-2xl sm:text-3xl font-bold text-[#1d1d1f] font-display tabular-numbers">
+              {partnerRating}
+            </div>
+            <div className="text-[10px] text-pink-600 font-bold mt-1">
+              Verified Partner Status
+            </div>
+          </div>
+        </div>
+
+        {/* COMPANION PORTFOLIO PHOTOS & GALLERY */}
+        <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-6 sm:p-7 border border-pink-200 shadow-apple-md mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-5 border-b border-pink-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-[#0071e3]" />
+                <h2 className="text-lg font-bold text-[#1d1d1f]">
+                  My Companion Portfolio Photos
+                </h2>
               </div>
+              <p className="text-xs text-[#86868b] mt-0.5">
+                Upload your lifestyle and date photos so seekers can view your profile when browsing companions
+              </p>
             </div>
-            <div className="text-3xl sm:text-4xl font-bold text-amber-500 mb-1 tabular-numbers">
-              {partnerRating} ★
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => galleryInputRef.current?.click()}
+                className="px-4 py-2 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Portfolio Photo</span>
+              </button>
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleGalleryUpload}
+              />
             </div>
-            <p className="text-[11px] text-pink-700 font-semibold">
-              1 Year Launch Pass Active
-            </p>
           </div>
 
+          {gallery.length === 0 ? (
+            <div 
+              onClick={() => galleryInputRef.current?.click()}
+              className="border-2 border-dashed border-pink-200 hover:border-[#0071e3] rounded-2xl p-8 text-center cursor-pointer transition-colors bg-[#fdf8f8]"
+            >
+              <Camera className="w-10 h-10 text-[#86868b] mx-auto mb-2" />
+              <h3 className="text-xs font-bold text-[#1d1d1f]">No Portfolio Photos Added Yet</h3>
+              <p className="text-[11px] text-[#86868b] max-w-xs mx-auto mt-1">
+                Companions with 3+ lifestyle photos receive up to 4x more booking requests. Click here to upload!
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {gallery.map((imgUrl, idx) => (
+                <div key={idx} className="relative group rounded-2xl overflow-hidden aspect-square border border-pink-200 shadow-sm">
+                  <img src={imgUrl} alt={`Portfolio ${idx + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveGalleryImage(idx)}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-rose-600 text-white flex items-center justify-center shadow-md transition opacity-0 group-hover:opacity-100"
+                    title="Remove Photo"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              {gallery.length < 8 && (
+                <div
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="aspect-square rounded-2xl border-2 border-dashed border-pink-200 hover:border-[#0071e3] flex flex-col items-center justify-center gap-1 text-[#86868b] hover:text-[#0071e3] cursor-pointer transition-colors bg-[#fdf8f8]"
+                >
+                  <Plus className="w-6 h-6" />
+                  <span className="text-[10px] font-bold">Add Photo</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 2. INCOMING SEEKER REQUESTS (MAIN WORKFLOW) */}
@@ -214,7 +402,7 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
                   {pendingRequests.length} Pending
                 </span>
               </div>
-              <p className="text-xs text-[#86868b] mt-0.5">Review booking details and accept to coordinate with the client</p>
+              <p className="text-xs text-[#86868b] mt-0.5">Real-time bookings received from clients</p>
             </div>
 
             <div className="hidden sm:flex items-center gap-1.5 text-xs text-[#0071e3] font-bold bg-blue-50 px-3 py-1 rounded-full">
@@ -262,18 +450,19 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
 
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                       <button
-                        onClick={() => handleAcceptRequest(req.id)}
-                        className="flex-1 sm:flex-initial bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-bold px-5 py-2.5 rounded-full transition shadow-sm flex items-center justify-center gap-1.5 apple-focus active:scale-95"
+                        onClick={() => handleDeclineRequest(req.id)}
+                        className="flex-1 sm:flex-none p-2.5 rounded-full border border-pink-200 hover:bg-rose-50 text-rose-600 transition apple-focus flex items-center justify-center gap-1 text-xs font-bold"
                       >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Accept</span>
+                        <XCircle className="w-4 h-4" />
+                        <span className="sm:hidden">Decline</span>
                       </button>
 
                       <button
-                        onClick={() => handleDeclineRequest(req.id)}
-                        className="bg-white hover:bg-stone-100 text-stone-700 text-xs font-bold px-4 py-2.5 rounded-full border border-pink-200 transition apple-focus"
+                        onClick={() => handleAcceptRequest(req.id)}
+                        className="flex-1 sm:flex-none px-6 py-2.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white transition shadow-apple-sm text-xs font-bold flex items-center justify-center gap-1.5 apple-focus active:scale-95"
                       >
-                        <XCircle className="w-4 h-4" />
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Accept Booking</span>
                       </button>
                     </div>
                   </div>
@@ -281,54 +470,52 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
               ))}
             </div>
           ) : (
-            <div className="text-center py-10 bg-[#fdf8f8] rounded-2xl border border-pink-100">
-              <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-              <p className="text-sm font-bold text-[#1d1d1f]">All caught up!</p>
-              <p className="text-xs text-[#86868b]">New seeker bookings will appear here instantly with live sound notifications.</p>
+            <div className="text-center py-12">
+              <div className="w-12 h-12 bg-pink-50 text-pink-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-[#1d1d1f] mb-1">
+                {initialLoaded ? 'No Pending Requests Right Now' : 'Checking for Bookings...'}
+              </h3>
+              <p className="text-xs text-[#86868b] max-w-sm mx-auto">
+                Your profile is active and online. When clients in your area book a companion, new booking requests will appear here automatically in real time.
+              </p>
             </div>
           )}
 
         </div>
 
-        {/* 3. ACCEPTED & SCHEDULED BOOKINGS */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-pink-200/80 shadow-sm mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-[#1d1d1f]">
-              Confirmed Active Meetups ({acceptedBookings.length})
-            </h3>
-            
-            {/* SOS Safety Button */}
-            <button
-              onClick={() => setSosActive(!sosActive)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 apple-focus ${
-                sosActive ? 'bg-red-600 text-white animate-pulse' : 'bg-red-50 text-red-700 border border-red-200'
-              }`}
-            >
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>{sosActive ? '24/7 SOS Alert Triggered!' : 'Emergency In-App SOS'}</span>
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {acceptedBookings.map((b) => (
-              <div key={b.id} className="bg-white p-4 rounded-2xl border border-pink-100 flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-bold text-[#1d1d1f] flex items-center gap-2">
-                    <span>{b.seekerName}</span>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.2 rounded-full font-bold">Confirmed</span>
+        {/* 3. CONFIRMED & UPCOMING SCHEDULE */}
+        {acceptedBookings.length > 0 && (
+          <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border border-pink-200 shadow-apple-md">
+            <h2 className="text-xl font-bold text-[#1d1d1f] mb-4">
+              Accepted &amp; Upcoming Bookings
+            </h2>
+            <div className="space-y-3">
+              {acceptedBookings.map((b) => (
+                <div key={b.id} className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div>
+                    <div className="flex items-center gap-2 font-bold text-[#1d1d1f]">
+                      <span>{b.seekerName}</span>
+                      <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full text-[10px]">
+                        Confirmed
+                      </span>
+                    </div>
+                    <div className="text-[#86868b] mt-1">
+                      {b.serviceTitle} &bull; {b.date} ({b.time}) &bull; {b.location}
+                    </div>
                   </div>
-                  <div className="text-xs text-pink-700 font-semibold mt-0.5">{b.serviceTitle}</div>
-                  <div className="text-[11px] text-[#86868b]">{b.date} &bull; {b.location}</div>
+                  <div className="text-right">
+                    <div className="font-bold text-emerald-700 text-base">
+                      ₹{b.netPayout.toLocaleString('en-IN')}
+                    </div>
+                    <div className="text-[10px] text-[#86868b]">Direct bank transfer</div>
+                  </div>
                 </div>
-
-                <div className="text-right">
-                  <div className="text-xs font-bold text-emerald-600 tabular-numbers">₹{b.netPayout}</div>
-                  <div className="text-[10px] text-[#86868b]">Settlement Ready</div>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
     </div>

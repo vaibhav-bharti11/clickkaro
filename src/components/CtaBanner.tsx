@@ -29,7 +29,7 @@ export const CtaBanner: React.FC<CtaBannerProps> = ({ onOpenBooking, onOpenPartn
         </h2>
 
         <p className="text-white/70 text-base sm:text-lg mb-10 leading-relaxed max-w-2xl body-pretty">
-          Stop missing out on cinema screenings, social gatherings, or needing elder care support alone. Connect with background-checked, verified companions in 19,000+ pin codes.
+          Stop missing out on cinema screenings, casual hangouts, dinner outings, or travel getaways alone. Connect with background-checked, verified companions across India's 12 premier launch cities.
         </p>
 
         {/* Conversion Buttons */}

@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { LAUNCH_CITIES } from '../data/launchCities';
 import { validatePincode, PincodeValidationResult } from '../utils/pincodeValidator';
 import { MapPin, ArrowRight, ShieldCheck, CheckCircle2, Navigation, AlertCircle, BellRing, Check } from 'lucide-react';
+import { recordWaitlistLeadInSupabase } from '../services/supabase';
 
 interface LaunchCitiesSectionProps {
-  onOpenBooking: (cityName?: string) => void;
+  onOpenBooking: (context?: any) => void;
 }
 
 export const LaunchCitiesSection: React.FC<LaunchCitiesSectionProps> = ({ onOpenBooking }) => {
@@ -34,8 +35,9 @@ export const LaunchCitiesSection: React.FC<LaunchCitiesSectionProps> = ({ onOpen
     setSearchPin('');
   };
 
-  const handleJoinWaitlist = () => {
+  const handleJoinWaitlist = async () => {
     setWaitlistSuccess(true);
+    await recordWaitlistLeadInSupabase(searchPin, validationResult?.cityName);
   };
 
   return (
@@ -138,7 +140,7 @@ export const LaunchCitiesSection: React.FC<LaunchCitiesSectionProps> = ({ onOpen
               <div className="pt-3">
                 <button
                   type="button"
-                  onClick={() => onOpenBooking(activeCity.name)}
+                  onClick={() => onOpenBooking({ city: activeCity.name, pinCode: activeCity.popularPinCodes[0] })}
                   className="rounded-full bg-gradient-to-r from-[#0071E3] to-[#0A84FF] hover:from-[#0077ED] hover:to-[#0055B3] text-white px-8 py-3.5 font-bold text-xs sm:text-sm transition shadow-apple-md hover:shadow-apple-lg active:scale-95 flex items-center gap-2 apple-focus"
                 >
                   <span>Book a Companion in {activeCity.name}</span>
@@ -195,7 +197,7 @@ export const LaunchCitiesSection: React.FC<LaunchCitiesSectionProps> = ({ onOpen
                       </p>
                       <button
                         type="button"
-                        onClick={() => onOpenBooking(validationResult.cityName)}
+                        onClick={() => onOpenBooking({ city: validationResult.cityName, pinCode: searchPin })}
                         className="w-full mt-2 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm flex items-center justify-center gap-1.5 active:scale-95"
                       >
                         <span>Book Instant Companion in {validationResult.cityName}</span>

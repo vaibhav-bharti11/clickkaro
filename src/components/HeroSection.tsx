@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, ShieldCheck, MapPin, Search, Phone, MessageSquare, UserCheck, Heart, Zap, Flame } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Phone, MessageSquare, UserCheck, Heart, Zap, Flame } from 'lucide-react';
 import { HERO_SCENES } from '../data/heroScenes';
 
 interface HeroSectionProps {
-  onOpenBooking: () => void;
+  onOpenBooking: (context?: any) => void;
   onOpenPartnerJoin: () => void;
-  onQuickSearch: (query: string) => void;
+  onQuickSearch?: (query: string) => void;
   activeSceneIndex?: number;
   onSceneChange?: (index: number) => void;
 }
@@ -13,11 +13,10 @@ interface HeroSectionProps {
 export const HeroSection: React.FC<HeroSectionProps> = ({ 
   onOpenBooking, 
   onOpenPartnerJoin, 
-  onQuickSearch,
+  onQuickSearch: _onQuickSearch,
   activeSceneIndex = 0,
   onSceneChange
 }) => {
-  const [searchPin, setSearchPin] = useState('');
   const [activeCompanionIdx, setActiveCompanionIdx] = useState(0);
   const [callingState, setCallingState] = useState(false);
   const [internalSceneIdx, setInternalSceneIdx] = useState(0);
@@ -96,18 +95,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const current = companions[activeCompanionIdx];
   const activeScene = HERO_SCENES[currentSceneIndex] || HERO_SCENES[0];
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchPin.trim()) {
-      onQuickSearch(searchPin.trim());
-    }
-  };
-
   const handleTriggerCall = () => {
     setCallingState(true);
     setTimeout(() => {
       setCallingState(false);
-      onOpenBooking();
+      onOpenBooking({
+        companionName: current.name,
+        companionAvatar: current.avatar,
+        service: 'movie-partner',
+      });
     }, 800);
   };
 
@@ -311,7 +307,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </button>
 
               <button
-                onClick={onOpenBooking}
+                onClick={() => onOpenBooking({
+                  companionName: current.name,
+                  companionAvatar: current.avatar,
+                  service: 'movie-partner',
+                })}
                 aria-label="Message companion"
                 className="w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center border border-white/20 transition shrink-0 apple-focus active:scale-95"
               >
@@ -341,30 +341,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               ))}
             </div>
           </div>
-
-          {/* Instant Pin Code Lookup Form */}
-          <form onSubmit={handleSearch} className="max-w-md mx-auto mt-8">
-            <label htmlFor="landinghero-pin-search" className="sr-only">Enter 6-digit Pin Code</label>
-            <div className="apple-liquid-glass rounded-full p-2 pl-5 flex items-center gap-2.5 border border-white/30 shadow-2xl focus-within:ring-2 focus-within:ring-[#0071E3] transition">
-              <MapPin className="w-4 h-4 text-[#0071E3] shrink-0" aria-hidden="true" />
-              <input 
-                id="landinghero-pin-search"
-                type="text"
-                value={searchPin}
-                onChange={(e) => setSearchPin(e.target.value)}
-                placeholder="Enter 6-digit pin code (e.g. 110001, 400050)..."
-                className="w-full bg-transparent text-xs sm:text-sm font-medium text-white placeholder-white/50 focus:outline-none"
-              />
-              <button 
-                type="submit"
-                aria-label="Search pin code"
-                className="bg-white hover:bg-white/90 text-black text-xs font-bold px-5 py-2.5 rounded-full transition flex items-center gap-1.5 shrink-0 apple-focus active:scale-95 shadow-md"
-              >
-                <Search className="w-3.5 h-3.5" />
-                <span>Search</span>
-              </button>
-            </div>
-          </form>
 
           {/* Catchy Viral Trust Indicators */}
           <div className="flex flex-wrap items-center justify-center gap-6 mt-8 text-xs font-semibold text-white/95 drop-shadow-md">

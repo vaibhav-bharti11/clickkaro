@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BackgroundVideo } from './components/BackgroundVideo';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
@@ -16,12 +16,17 @@ import { BookingModal, PartnerJoinModal } from './components/Modals';
 import { AuthRoleModal } from './components/AuthRoleModal';
 import { SeekerDashboard } from './components/SeekerDashboard';
 import { CompanionDashboard } from './components/CompanionDashboard';
-import { ServiceItem, UserRole, CompanionProfile } from './types';
+import { ServiceItem, UserRole, CompanionProfile, BookingContext } from './types';
+import { ALL_SERVICES } from './data/servicesData';
+import { LAUNCH_CITIES } from './data/launchCities';
+import { subscribeToAuthChanges } from './services/firebase';
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'landing' | 'seeker' | 'companion'>('landing');
   const [userRole, setUserRole] = useState<UserRole>('seeker');
-  const [userName, setUserName] = useState<string>('vaibhav');
+  const [userName, setUserName] = useState<string>(() => {
+    return localStorage.getItem('ck_user_name') || 'vaibhav';
+  });
   const [userAvatar, setUserAvatar] = useState<string>(() => {
     return localStorage.getItem('ck_user_avatar') || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80';
   });
@@ -30,8 +35,31 @@ export const App: React.FC = () => {
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signup');
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
+  const [bookingContext, setBookingContext] = useState<BookingContext | null>(null);
   const [activeHeroSceneIndex, setActiveHeroSceneIndex] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthChanges((user) => {
+      if (user) {
+        if (user.displayName) {
+          setUserName(user.displayName);
+          localStorage.setItem('ck_user_name', user.displayName);
+        }
+        if (user.photoURL) {
+          setUserAvatar(user.photoURL);
+          localStorage.setItem('ck_user_avatar', user.photoURL);
+        }
+        if (user.email) {
+          localStorage.setItem('ck_user_email', user.email);
+        }
+        if (user.phoneNumber) {
+          localStorage.setItem('ck_user_phone', user.phoneNumber);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleOpenAuth = (mode: 'signin' | 'signup' = 'signup') => {
     setAuthModalMode(mode);
@@ -46,6 +74,9 @@ export const App: React.FC = () => {
   const handleRoleSelected = (role: UserRole, name: string, avatarUrl?: string) => {
     setUserRole(role);
     setUserName(name || 'vaibhav');
+    if (name) {
+      localStorage.setItem('ck_user_name', name);
+    }
     if (avatarUrl) {
       setUserAvatar(avatarUrl);
       localStorage.setItem('ck_user_avatar', avatarUrl);
@@ -80,26 +111,53 @@ export const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleOpenBooking = (service?: ServiceItem | string) => {
-    if (typeof service === 'object' && service !== null) {
-      setSelectedService(service);
+  // Unified, context-aware booking opener that preserves service, city, pincode, and companion
+  const handleOpenBooking = (
+    target?: ServiceItem | string | BookingContext,
+    extraContext?: Partial<BookingContext>
+  ) => {
+    let ctx: BookingContext = {};
+
+    if (typeof target === 'string') {
+      const matchedService = ALL_SERVICES.find(
+        (s) => s.id === target || s.title.toLowerCase() === target.toLowerCase()
+      );
+      if (matchedService) {
+        ctx.service = matchedService;
+      } else {
+        ctx.city = target;
+        const matchedCity = LAUNCH_CITIES.find(
+          (c) => c.name.toLowerCase() === target.toLowerCase()
+        );
+        if (matchedCity && matchedCity.popularPinCodes.length > 0) {
+          ctx.pinCode = matchedCity.popularPinCodes[0];
+        }
+      }
+    } else if (target && typeof target === 'object') {
+      if ('pricePerHour' in target && 'category' in target) {
+        ctx.service = target as ServiceItem;
+      } else {
+        ctx = { ...(target as BookingContext) };
+      }
     }
+
+    if (extraContext) {
+      ctx = { ...ctx, ...extraContext };
+    }
+
+    setBookingContext(ctx);
     setBookingModalOpen(true);
   };
 
   const handleBookFromCompanionCard = (companion: CompanionProfile) => {
-    const dummyService: ServiceItem = {
-      id: companion.services[0] || 'movie-partner',
-      title: `${companion.name} (${companion.badges[0] || 'Companion'})`,
-      subtitle: `${companion.city} • Verified Match`,
-      pricePerHour: companion.hourlyRate,
-      icon: 'ph-user-check',
-      emoji: '✨',
-      category: 'social',
-      description: companion.bio,
-    };
-    setSelectedService(dummyService);
-    setBookingModalOpen(true);
+    handleOpenBooking({
+      service: companion.services[0] || 'movie-partner',
+      city: companion.city,
+      pinCode: companion.pinCode,
+      companionName: companion.name,
+      companionAvatar: companion.avatarUrl,
+      companionRate: companion.hourlyRate,
+    });
   };
 
   const handleOpenPartnerJoin = () => {
@@ -144,6 +202,11 @@ export const App: React.FC = () => {
       {currentView === 'seeker' && (
         <SeekerDashboard 
           userName={userName || 'vaibhav'}
+          userAvatar={userAvatar}
+          onUpdateAvatar={(newAvatar) => {
+            setUserAvatar(newAvatar);
+            localStorage.setItem('ck_user_avatar', newAvatar);
+          }}
           onBackToHome={() => { setCurrentView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           onSwitchToCompanion={() => { setUserRole('companion'); setCurrentView('companion'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           onBookCompanion={handleBookFromCompanionCard}
@@ -154,7 +217,12 @@ export const App: React.FC = () => {
       {/* VIEW 2: COMPANION EARNINGS & REQUESTS DASHBOARD */}
       {currentView === 'companion' && (
         <CompanionDashboard 
-          userName="Priya Sharma"
+          userName={userName || 'Companion'}
+          userAvatar={userAvatar}
+          onUpdateAvatar={(newAvatar) => {
+            setUserAvatar(newAvatar);
+            localStorage.setItem('ck_user_avatar', newAvatar);
+          }}
           onBackToHome={() => { setCurrentView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           onSwitchToSeeker={() => { setUserRole('seeker'); setCurrentView('seeker'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           onLogout={handleLogout}
@@ -168,14 +236,14 @@ export const App: React.FC = () => {
           <HeroSection 
             activeSceneIndex={activeHeroSceneIndex}
             onSceneChange={setActiveHeroSceneIndex}
-            onOpenBooking={() => handleOpenBooking()}
+            onOpenBooking={handleOpenBooking}
             onOpenPartnerJoin={handleOpenPartnerJoin}
             onQuickSearch={handleQuickSearch}
           />
 
           {/* 2. Official 12 Launch Cities (Client Note: Dehradun, Delhi, Gurgaon, Noida, Bangalore, Mumbai, etc.) */}
           <LaunchCitiesSection 
-            onOpenBooking={(cityName) => handleOpenBooking(cityName)}
+            onOpenBooking={handleOpenBooking}
           />
 
           {/* 3. Complete Services Catalog (including Travel Partner ₹14,999/12h & Coffee Partner ₹1,999/1h) */}
@@ -198,11 +266,11 @@ export const App: React.FC = () => {
 
           {/* 7. Pricing Section with Official ₹999 / 3 Months Subscription */}
           <PricingSection 
-            onOpenBooking={() => handleOpenBooking()}
+            onOpenBooking={(srvId) => handleOpenBooking(srvId)}
             onOpenPartnerJoin={handleOpenPartnerJoin}
           />
 
-          {/* 8. Millions Registered Section - MOVED TO BOTTOM ABOVE FAQS AS REQUESTED */}
+          {/* 8. Millions Registered Section */}
           <StatsBar />
 
           {/* 9. FAQs Accordion */}
@@ -235,7 +303,8 @@ export const App: React.FC = () => {
       <BookingModal 
         isOpen={bookingModalOpen}
         onClose={() => setBookingModalOpen(false)}
-        initialService={selectedService}
+        initialContext={bookingContext}
+        userName={userName}
       />
 
       <PartnerJoinModal 

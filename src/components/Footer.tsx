@@ -49,7 +49,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
                 />
               </div>
               <p className="mb-3 text-[11px] text-[#86868b] leading-relaxed">
-                India's #1 Social &amp; Lifestyle Support Platform. Safe, verified, consent-first companionship across 19,000+ pin codes.
+                India's #1 Social &amp; Lifestyle Support Platform. Safe, verified, consent-first companionship across 12 designated launch hubs.
               </p>
               <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-pink-50 text-[#1d1d1f] text-[10px] font-semibold border border-pink-200">
                 <ShieldCheck className="w-3 h-3 text-[#0071e3]" /> 100% Aadhaar KYC
@@ -59,14 +59,14 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
             {/* Services */}
             <div className="flex flex-col gap-2.5">
               <h4 className="text-[#1d1d1f] font-bold text-xs tracking-tight">
-                Services
+                Official Services
               </h4>
-              <a href="#services" className="hover:text-[#0071e3] transition">Movie Partner</a>
-              <a href="#services" className="hover:text-[#0071e3] transition">Elder Care</a>
-              <a href="#services" className="hover:text-[#0071e3] transition">Shopping Buddy</a>
-              <a href="#services" className="hover:text-[#0071e3] transition">Clubbing &amp; Events</a>
-              <a href="#services" className="hover:text-[#0071e3] transition">Travel Partner</a>
-              <a href="#services" className="hover:text-[#0071e3] transition">Coffee &amp; Cafes</a>
+              <a href="#services" className="hover:text-[#0071e3] transition">Hangout (4 Hours)</a>
+              <a href="#services" className="hover:text-[#0071e3] transition">Movie Partner (4 Hours)</a>
+              <a href="#services" className="hover:text-[#0071e3] transition">Clubbing (6 Hours)</a>
+              <a href="#services" className="hover:text-[#0071e3] transition">Lunch/Dinner (2 Hours)</a>
+              <a href="#services" className="hover:text-[#0071e3] transition">Travel Partner (12 Hours)</a>
+              <a href="#services" className="hover:text-[#0071e3] transition">Coffee Partner (1 Hour)</a>
             </div>
 
             {/* Platform */}

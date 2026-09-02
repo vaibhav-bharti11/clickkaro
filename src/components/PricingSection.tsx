@@ -3,7 +3,7 @@ import { MEMBERSHIP_PLANS, ALL_SERVICES } from '../data/servicesData';
 import { Check, ShieldCheck, Sparkles, Clock, ArrowRight } from 'lucide-react';
 
 interface PricingSectionProps {
-  onOpenBooking: (serviceId?: string) => void;
+  onOpenBooking: (serviceOrContext?: any) => void;
   onOpenPartnerJoin: () => void;
 }
 

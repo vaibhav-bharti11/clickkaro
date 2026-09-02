@@ -114,3 +114,12 @@ export interface BookingRequest {
   status: 'pending' | 'accepted' | 'declined' | 'completed';
   createdAt: string;
 }
+
+export interface BookingContext {
+  service?: ServiceItem | string;
+  city?: string;
+  pinCode?: string;
+  companionName?: string;
+  companionAvatar?: string;
+  companionRate?: number;
+}
