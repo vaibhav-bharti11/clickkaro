@@ -8,6 +8,9 @@ import {
   ConfirmationResult, 
   signOut, 
   onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
   User,
   Auth
 } from 'firebase/auth';
@@ -84,6 +87,67 @@ export const signInWithGoogle = async (): Promise<AuthUserProfile> => {
     photoURL: user.photoURL,
     phoneNumber: user.phoneNumber,
     providerId: 'google.com',
+  };
+};
+
+// -------------------------------------------------------------------------
+// 1.1 EMAIL & PASSWORD DIRECT AUTHENTICATION
+// -------------------------------------------------------------------------
+export const signUpWithEmailPassword = async (
+  email: string, 
+  pass: string, 
+  displayName?: string
+): Promise<AuthUserProfile> => {
+  if (!auth) {
+    return {
+      uid: 'email-user-' + Math.random().toString(36).substring(2, 9),
+      displayName: displayName || email.split('@')[0],
+      email,
+      photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+      phoneNumber: null,
+      providerId: 'password',
+    };
+  }
+
+  const credential = await createUserWithEmailAndPassword(auth, email, pass);
+  if (displayName && credential.user) {
+    try {
+      await updateProfile(credential.user, { displayName });
+    } catch {}
+  }
+  return {
+    uid: credential.user.uid,
+    displayName: credential.user.displayName || displayName || email.split('@')[0],
+    email: credential.user.email,
+    photoURL: credential.user.photoURL,
+    phoneNumber: credential.user.phoneNumber,
+    providerId: 'password',
+  };
+};
+
+export const signInWithEmailPassword = async (
+  email: string, 
+  pass: string
+): Promise<AuthUserProfile> => {
+  if (!auth) {
+    return {
+      uid: 'email-user-' + Math.random().toString(36).substring(2, 9),
+      displayName: email.split('@')[0],
+      email,
+      photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+      phoneNumber: null,
+      providerId: 'password',
+    };
+  }
+
+  const credential = await signInWithEmailAndPassword(auth, email, pass);
+  return {
+    uid: credential.user.uid,
+    displayName: credential.user.displayName || credential.user.email?.split('@')[0] || 'User',
+    email: credential.user.email,
+    photoURL: credential.user.photoURL,
+    phoneNumber: credential.user.phoneNumber,
+    providerId: 'password',
   };
 };
 

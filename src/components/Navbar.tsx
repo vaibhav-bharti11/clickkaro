@@ -134,7 +134,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
 
               {/* DUAL MODE INSTANT SWITCHER PILL WITH USER AVATAR */}
-              {currentRole ? (
+              {userName ? (
                 <div className="flex items-center bg-white/95 p-1 rounded-full border border-pink-200 shadow-sm backdrop-blur-md">
                   {/* User Profile Avatar & Name */}
                   <div className="flex items-center gap-2 pl-1 pr-2.5 py-0.5 border-r border-pink-200/80">
@@ -323,28 +323,42 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         <div className="flex flex-col gap-4 overflow-y-auto no-scrollbar">
-          {/* Dual Role Switch in Mobile Menu */}
-          <div className="p-3 bg-pink-50/70 rounded-2xl border border-pink-200">
-            <div className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider mb-2">Switch Active View</div>
-            <div className="grid grid-cols-2 gap-2">
+          {/* Dual Role Switch in Mobile Menu if Logged In */}
+          {userName ? (
+            <div className="p-3 bg-pink-50/70 rounded-2xl border border-pink-200">
+              <div className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider mb-2">
+                Active View: {userName}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { setMobileMenuOpen(false); onSwitchMode('seeker'); }}
+                  className={`py-2 rounded-xl text-xs font-bold transition text-center ${
+                    currentView === 'seeker' ? 'bg-[#0071e3] text-white' : 'bg-white text-[#1d1d1f] border border-pink-200'
+                  }`}
+                >
+                  Seeker Hub
+                </button>
+                <button
+                  onClick={() => { setMobileMenuOpen(false); onSwitchMode('companion'); }}
+                  className={`py-2 rounded-xl text-xs font-bold transition text-center ${
+                    currentView === 'companion' ? 'bg-[#1d1d1f] text-white' : 'bg-white text-[#1d1d1f] border border-pink-200'
+                  }`}
+                >
+                  Companion Hub
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 bg-pink-50/70 rounded-2xl border border-pink-200 text-center">
+              <p className="text-xs text-[#1d1d1f] font-bold mb-2">Welcome to Click Karo Date Karo</p>
               <button
-                onClick={() => { setMobileMenuOpen(false); onSwitchMode('seeker'); }}
-                className={`py-2 rounded-xl text-xs font-bold transition text-center ${
-                  currentView === 'seeker' ? 'bg-[#0071e3] text-white' : 'bg-white text-[#1d1d1f] border border-pink-200'
-                }`}
+                onClick={() => { setMobileMenuOpen(false); onOpenAuth('signin'); }}
+                className="w-full bg-[#0071e3] text-white py-2.5 rounded-full text-xs font-bold shadow-sm"
               >
-                Seeker Hub
-              </button>
-              <button
-                onClick={() => { setMobileMenuOpen(false); onSwitchMode('companion'); }}
-                className={`py-2 rounded-xl text-xs font-bold transition text-center ${
-                  currentView === 'companion' ? 'bg-[#1d1d1f] text-white' : 'bg-white text-[#1d1d1f] border border-pink-200'
-                }`}
-              >
-                Companion Hub
+                Sign In / Join
               </button>
             </div>
-          </div>
+          )}
 
           <button 
             onClick={() => { setMobileMenuOpen(false); onSwitchMode('landing'); }}

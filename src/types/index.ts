@@ -103,6 +103,7 @@ export interface BookingRequest {
   id: string;
   seekerName: string;
   seekerPhone: string;
+  seekerAvatar?: string;
   serviceTitle: string;
   date: string;
   time: string;

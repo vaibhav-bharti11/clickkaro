@@ -1,9 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { MOCK_COMPANIONS } from '../data/mockProfiles';
 import { CompanionProfile } from '../types';
-import { MapPin, Search, Star, Heart, ArrowLeft, X, Sparkles, CheckCircle2, LogOut, Clock, Calendar, RefreshCw, Camera } from 'lucide-react';
+import { MapPin, Search, Star, Heart, ArrowLeft, X, Sparkles, CheckCircle2, LogOut, Clock, Calendar, RefreshCw, Camera, Dices, ShieldCheck, ShieldAlert, MessageSquare, Plus, Trash2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { fetchCompanionsFromSupabase, fetchBookingsFromSupabase, updateUserAvatarInSupabase } from '../services/supabase';
+import { fetchCompanionsFromSupabase, fetchBookingsFromSupabase, updateUserAvatarInSupabase, recordBookingInSupabase } from '../services/supabase';
+import { FaceVerificationModal } from './FaceVerificationModal';
+import { RandomMatchModal } from './RandomMatchModal';
+import { ChatModal } from './ChatModal';
 
 interface SeekerDashboardProps {
   userName: string;
@@ -25,12 +28,29 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
   onLogout,
 }) => {
   const [selectedCity, setSelectedCity] = useState(() => localStorage.getItem('ck_user_city') || 'All India');
-  const [selectedPinCode, setSelectedPinCode] = useState('');
+  const [selectedPinCode, setSelectedPinCode] = useState(() => localStorage.getItem('ck_user_pincode') || '');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [currentProfileIndex, setCurrentProfileIndex] = useState(0);
   const [likedProfiles, setLikedProfiles] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'swipe' | 'grid'>('swipe');
   const [matchedAnimation, setMatchedAnimation] = useState<string | null>(null);
+
+  // Verification & Photos state
+  const [kycVerified, setKycVerified] = useState(() => localStorage.getItem('ck_kyc_verified') === 'true');
+  const [faceModalOpen, setFaceModalOpen] = useState(false);
+  const [randomModalOpen, setRandomModalOpen] = useState(false);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [chatTarget, setChatTarget] = useState<{ name: string; avatar?: string; phone?: string; bookingCode: string } | null>(null);
+  const [photoRequirementModal, setPhotoRequirementModal] = useState(false);
+
+  const [userPhotos, setUserPhotos] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('ck_user_photos');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    const avatar = userAvatar || localStorage.getItem('ck_user_avatar');
+    return avatar ? [avatar] : [];
+  });
 
   // Supabase live data
   const [companions, setCompanions] = useState<CompanionProfile[]>(MOCK_COMPANIONS);
@@ -39,6 +59,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
   const [loadingBookings, setLoadingBookings] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const extraPhotoInputRef = useRef<HTMLInputElement>(null);
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -49,28 +70,50 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
           const newUrl = reader.result;
           if (onUpdateAvatar) onUpdateAvatar(newUrl);
           localStorage.setItem('ck_user_avatar', newUrl);
+          
+          // Update photos list
+          const updated = userPhotos.length > 0 ? [newUrl, ...userPhotos.slice(1)] : [newUrl];
+          setUserPhotos(updated);
+          localStorage.setItem('ck_user_photos', JSON.stringify(updated));
+
           const phone = localStorage.getItem('ck_user_phone') || undefined;
           const email = localStorage.getItem('ck_user_email') || undefined;
           await updateUserAvatarInSupabase(newUrl, { phone, email, name: userName });
-          confetti({
-            particleCount: 40,
-            spread: 50,
-            origin: { y: 0.3 }
-          });
+          confetti({ particleCount: 30, spread: 50, origin: { y: 0.3 } });
         }
       };
       reader.readAsDataURL(file);
     }
   };
 
+  const handleExtraPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          const updated = [...userPhotos, reader.result];
+          setUserPhotos(updated);
+          localStorage.setItem('ck_user_photos', JSON.stringify(updated));
+          confetti({ particleCount: 40, spread: 60, origin: { y: 0.4 } });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removePhoto = (idx: number) => {
+    const updated = userPhotos.filter((_, i) => i !== idx);
+    setUserPhotos(updated);
+    localStorage.setItem('ck_user_photos', JSON.stringify(updated));
+  };
+
   useEffect(() => {
-    // Fetch live companions from Supabase
     fetchCompanionsFromSupabase().then((data) => {
       if (data && data.length > 0) {
         setCompanions(data);
       }
     });
-
     refreshBookings();
   }, []);
 
@@ -114,7 +157,9 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
       const matchesCity = selectedCity === 'All India' || 
         comp.city.toLowerCase().includes(selectedCity.toLowerCase()) || 
         selectedCity.toLowerCase().includes(comp.city.toLowerCase());
-      const matchesPin = !selectedPinCode || comp.pinCode.includes(selectedPinCode.trim());
+      const matchesPin = !selectedPinCode || 
+        comp.pinCode.trim().includes(selectedPinCode.trim()) || 
+        selectedPinCode.trim().includes(comp.pinCode.trim());
       const matchesCat = selectedCategory === 'all' || comp.services.includes(selectedCategory);
       return matchesCity && matchesPin && matchesCat;
     });
@@ -134,20 +179,59 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
     }
   };
 
-  const handleLike = (companion: CompanionProfile) => {
+  const verifyPrerequisites = (): boolean => {
+    if (userPhotos.length < 2) {
+      setPhotoRequirementModal(true);
+      return false;
+    }
+    if (!kycVerified) {
+      setFaceModalOpen(true);
+      return false;
+    }
+    return true;
+  };
+
+  const handleBookWithVerification = (comp: CompanionProfile) => {
+    if (!verifyPrerequisites()) return;
+    onBookCompanion(comp);
+  };
+
+  const handleLike = async (companion: CompanionProfile) => {
+    if (!verifyPrerequisites()) return;
+
     if (!likedProfiles.includes(companion.id)) {
       setLikedProfiles([...likedProfiles, companion.id]);
     }
     setMatchedAnimation(companion.name);
     confetti({
-      particleCount: 50,
+      particleCount: 60,
       spread: 60,
       origin: { y: 0.7 }
     });
+
+    // Record live companion match request in Supabase bookings
+    await recordBookingInSupabase({
+      client_name: userName || 'Seeker',
+      client_phone: localStorage.getItem('ck_user_phone') || 'Confidential',
+      client_email: localStorage.getItem('ck_user_email') || null,
+      service_id: 'hangout',
+      service_title: 'Instant Companion Connect',
+      city: companion.city,
+      pin_code: companion.pinCode,
+      booking_date: new Date().toISOString().split('T')[0],
+      hours: 2,
+      total_price: companion.hourlyRate * 2,
+      companion_name: companion.name,
+      companion_avatar: companion.avatarUrl,
+      concierge_notes: `Direct swipe match connection from ${userName}`
+    });
+
+    refreshBookings();
+
     setTimeout(() => {
       setMatchedAnimation(null);
       handleNext();
-    }, 1200);
+    }, 1400);
   };
 
   return (
@@ -196,15 +280,35 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
                 <h1 className="text-xl sm:text-2xl font-bold text-[#1d1d1f]">
                   Seeker Hub &bull; {userName}
                 </h1>
-                <span className="text-[10px] font-bold text-[#0071e3] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
-                  Client Mode
-                </span>
+                {kycVerified ? (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    <span>Face Verified</span>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setFaceModalOpen(true)}
+                    className="text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1 transition"
+                  >
+                    <ShieldAlert className="w-3 h-3 text-amber-600" />
+                    <span>Verify Face (Required)</span>
+                  </button>
+                )}
               </div>
-              <p className="text-xs text-[#86868b]">Verified companions ready in your locality</p>
+              <p className="text-xs text-[#86868b]">Verified companions ready in {selectedCity}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2.5">
+            {/* BOOK RANDOM MATCHMAKER BUTTON */}
+            <button
+              onClick={() => setRandomModalOpen(true)}
+              className="px-4 py-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white text-xs font-bold transition shadow-sm flex items-center gap-1.5 active:scale-95"
+            >
+              <Dices className="w-3.5 h-3.5" />
+              <span>Book Random 🎲</span>
+            </button>
+
             {activeTab === 'explore' && (
               <div className="flex bg-pink-100/60 p-1 rounded-full border border-pink-200">
                 <button
@@ -246,28 +350,69 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
           </div>
         </div>
 
-        {/* Live Seeker Status Banner */}
-        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-pink-50 rounded-2xl p-3.5 border border-blue-200/80 mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <span className="px-2.5 py-1 rounded-full bg-[#0071E3] text-white font-bold text-[10px] uppercase tracking-wider">
-              Connected
-            </span>
-            <span className="font-bold text-[#1d1d1f]">
-              {userName} ({localStorage.getItem('ck_user_city') || 'Delhi NCR'} &bull; PIN {localStorage.getItem('ck_user_pincode') || '110001'})
-            </span>
-            <span className="hidden md:inline-block text-[#86868b]">&bull;</span>
-            <span className="hidden md:inline-block text-emerald-700 font-semibold">
-              100% Aadhaar KYC Verified
-            </span>
+        {/* Live Seeker Status Banner & Photo Gallery Manager */}
+        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-pink-50 rounded-2xl p-4 border border-blue-200/80 mb-6 space-y-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <span className="px-2.5 py-1 rounded-full bg-[#0071E3] text-white font-bold text-[10px] uppercase tracking-wider">
+                My Profile
+              </span>
+              <span className="font-bold text-[#1d1d1f]">
+                {userName} ({localStorage.getItem('ck_user_city') || 'Delhi NCR'} &bull; PIN {localStorage.getItem('ck_user_pincode') || '110001'})
+              </span>
+              <span className="hidden md:inline-block text-[#86868b]">&bull;</span>
+              <span className="text-xs font-semibold text-[#1d1d1f]">
+                {userPhotos.length}/3 Verified Photos Uploaded
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => extraPhotoInputRef.current?.click()}
+                className="text-xs font-bold bg-white text-[#0071e3] border border-blue-200 px-3 py-1.5 rounded-full hover:bg-blue-50 flex items-center gap-1 shadow-xs transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Photo ({userPhotos.length}/3)</span>
+              </button>
+              <input
+                ref={extraPhotoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleExtraPhotoUpload}
+              />
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="text-[#0071E3] hover:underline font-bold flex items-center gap-1 text-xs"
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span>Change Profile Picture</span>
-          </button>
+
+          {/* User's Verified Photo Thumbnails */}
+          {userPhotos.length > 0 && (
+            <div className="flex items-center gap-2 pt-1 border-t border-blue-200/40">
+              {userPhotos.map((url, idx) => (
+                <div key={idx} className="relative group w-12 h-12 rounded-xl overflow-hidden ring-2 ring-white shadow-xs">
+                  <img src={url} alt={`User Photo ${idx + 1}`} className="w-full h-full object-cover" />
+                  {userPhotos.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(idx)}
+                      className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
+                      title="Remove Photo"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-300" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {userPhotos.length < 3 && (
+                <div
+                  onClick={() => extraPhotoInputRef.current?.click()}
+                  className="w-12 h-12 rounded-xl border-2 border-dashed border-blue-300 bg-white/60 hover:bg-white flex flex-col items-center justify-center text-blue-500 cursor-pointer transition text-[9px] font-bold"
+                >
+                  <Plus className="w-4 h-4" />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Primary Tab Switcher: Explore Companions vs My Bookings */}
@@ -339,7 +484,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
                       type="text"
                       value={selectedPinCode}
                       onChange={(e) => { setSelectedPinCode(e.target.value); setCurrentProfileIndex(0); }}
-                      placeholder="e.g. 110001, 400050, 560001"
+                      placeholder="e.g. 110001, 248007, 400050"
                       className="w-full bg-[#fdf8f8] border border-pink-200 rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm font-bold text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
                     />
                   </div>
@@ -380,7 +525,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
                     <Sparkles className="w-12 h-12 mb-2 animate-bounce" />
                     <h3 className="text-2xl font-bold font-display">It's a Match!</h3>
                     <p className="text-xs opacity-90 mt-1">
-                      You connected with {matchedAnimation}. Open the booking modal below to schedule your date.
+                      You connected with {matchedAnimation}. Booking request dispatched to companion!
                     </p>
                   </div>
                 )}
@@ -447,7 +592,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
                       </button>
 
                       <button
-                        onClick={() => onBookCompanion(activeProfile)}
+                        onClick={() => handleBookWithVerification(activeProfile)}
                         className="flex-1 bg-[#0071e3] hover:bg-[#0077ed] text-white py-3.5 rounded-full font-bold text-xs sm:text-sm transition shadow-apple-sm active:scale-98 apple-focus"
                       >
                         Book {activeProfile.name} (₹{activeProfile.hourlyRate}/hr)
@@ -510,7 +655,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
 
                     <div className="p-4 pt-0 flex gap-2">
                       <button
-                        onClick={() => onBookCompanion(comp)}
+                        onClick={() => handleBookWithVerification(comp)}
                         className="w-full bg-[#0071e3] hover:bg-[#0077ed] text-white py-2.5 rounded-full text-xs font-bold transition shadow-sm apple-focus"
                       >
                         Book Now (₹{comp.hourlyRate}/hr)
@@ -581,7 +726,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
                       </p>
                     )}
 
-                    <div className="grid grid-cols-2 gap-2 text-xs text-[#86868b] pt-2 border-t border-pink-100">
+                    <div className="grid grid-cols-2 gap-2 text-xs text-[#86868b] pt-2 border-t border-pink-100 mb-3">
                       <div className="flex items-center gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-pink-500" />
                         <span>{b.city} ({b.pin_code})</span>
@@ -598,11 +743,90 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
                         ₹{Number(b.total_price).toLocaleString('en-IN')}
                       </div>
                     </div>
+
+                    {/* Chat with Companion Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChatTarget({
+                          name: b.companion_name || 'Companion Concierge',
+                          avatar: b.companion_avatar,
+                          phone: undefined,
+                          bookingCode: b.booking_code,
+                        });
+                        setChatModalOpen(true);
+                      }}
+                      className="w-full bg-pink-50 hover:bg-pink-100 text-[#0071e3] border border-pink-200 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Chat with Companion</span>
+                    </button>
                   </div>
                 ))}
               </div>
             )}
           </div>
+        )}
+
+        {/* PHOTO REQUIREMENT MODAL */}
+        {photoRequirementModal && (
+          <div className="fixed inset-0 z-[175] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center border border-pink-200 shadow-apple-lg space-y-3">
+              <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto ring-4 ring-amber-50">
+                <Camera className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-[#1d1d1f]">2 Photos Required</h3>
+              <p className="text-xs text-[#86868b] leading-relaxed">
+                For community safety, all seekers must add at least 2 clear photos before booking or matching with companions.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setPhotoRequirementModal(false);
+                  extraPhotoInputRef.current?.click();
+                }}
+                className="w-full bg-[#0071e3] text-white py-3 rounded-full font-bold text-xs shadow-sm hover:bg-[#0077ed] transition"
+              >
+                Upload Second Photo Now
+              </button>
+              <button
+                type="button"
+                onClick={() => setPhotoRequirementModal(false)}
+                className="text-xs text-[#86868b] hover:underline"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* MODALS */}
+        <FaceVerificationModal
+          isOpen={faceModalOpen}
+          onClose={() => setFaceModalOpen(false)}
+          onVerified={() => setKycVerified(true)}
+          userName={userName}
+          userPhotos={userPhotos}
+        />
+
+        <RandomMatchModal
+          isOpen={randomModalOpen}
+          onClose={() => setRandomModalOpen(false)}
+          companions={companions}
+          currentCity={selectedCity}
+          onSelectCompanion={(matched) => handleBookWithVerification(matched)}
+        />
+
+        {chatTarget && (
+          <ChatModal
+            isOpen={chatModalOpen}
+            onClose={() => setChatModalOpen(false)}
+            bookingCode={chatTarget.bookingCode}
+            otherPartyName={chatTarget.name}
+            otherPartyAvatar={chatTarget.avatar}
+            otherPartyPhone={chatTarget.phone}
+            currentRole="seeker"
+          />
         )}
 
       </div>

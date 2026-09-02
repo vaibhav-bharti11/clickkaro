@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BookingRequest } from '../types';
-import { TrendingUp, CheckCircle2, XCircle, Clock, ShieldCheck, ArrowLeft, Sparkles, MapPin, DollarSign, Calendar, AlertTriangle, LogOut, Camera, Plus, Trash2, Image as ImageIcon } from 'lucide-react';
+import { TrendingUp, CheckCircle2, XCircle, Clock, ShieldCheck, ArrowLeft, Sparkles, MapPin, DollarSign, Calendar, AlertTriangle, LogOut, Camera, Plus, Trash2, Image as ImageIcon, MessageSquare, Phone, UserCheck, Bell, ShieldAlert } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { fetchCompanionRequestsFromSupabase, updateBookingStatusInSupabase, updateUserAvatarInSupabase } from '../services/supabase';
+import { fetchCompanionRequestsFromSupabase, updateBookingStatusInSupabase, updateUserAvatarInSupabase, sendBookingConfirmationEmail } from '../services/supabase';
+import { SeekerProfileModal } from './SeekerProfileModal';
+import { ChatModal } from './ChatModal';
+import { FaceVerificationModal } from './FaceVerificationModal';
 
 interface CompanionDashboardProps {
   userName: string;
@@ -25,7 +28,15 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
   const [requests, setRequests] = useState<BookingRequest[]>([]);
   const [sosActive, setSosActive] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
-  
+  const [newBookingAlert, setNewBookingAlert] = useState<string | null>(null);
+
+  // Verification & Modals state
+  const [kycVerified, setKycVerified] = useState(() => localStorage.getItem('ck_kyc_verified') === 'true');
+  const [faceModalOpen, setFaceModalOpen] = useState(false);
+  const [activeProfileModal, setActiveProfileModal] = useState<BookingRequest | null>(null);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [chatTarget, setChatTarget] = useState<{ name: string; avatar?: string; phone?: string; bookingCode: string } | null>(null);
+
   // Gallery state for portfolio photos
   const [gallery, setGallery] = useState<string[]>(() => {
     try {
@@ -97,6 +108,7 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
           id: b.id,
           seekerName: b.client_name,
           seekerPhone: b.client_phone || 'Protected',
+          seekerAvatar: b.companion_avatar,
           serviceTitle: b.service_title,
           date: b.booking_date,
           time: 'Scheduled Slot',
@@ -108,6 +120,14 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
           status: (b.status === 'confirmed' ? 'accepted' : b.status === 'cancelled' ? 'declined' : 'pending') as any,
           createdAt: new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         }));
+        
+        // Trigger notification if new request arrived
+        if (mapped.some(m => m.status === 'pending') && (!requests || requests.length < mapped.length)) {
+          const newest = mapped.find(m => m.status === 'pending');
+          if (newest) {
+            setNewBookingAlert(`New companion booking request from ${newest.seekerName}!`);
+          }
+        }
         setRequests(mapped);
       } else {
         setRequests([]);
@@ -141,8 +161,22 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
       prev.map((r) => (r.id === id ? { ...r, status: 'accepted' as const } : r))
     );
     await updateBookingStatusInSupabase(id, 'confirmed');
+
+    const acceptedReq = requests.find(r => r.id === id);
+    if (acceptedReq) {
+      // Dispatch official confirmation email
+      await sendBookingConfirmationEmail({
+        booking_code: id.slice(0, 8),
+        client_name: acceptedReq.seekerName,
+        service_title: acceptedReq.serviceTitle,
+        city: acceptedReq.location,
+        booking_date: acceptedReq.date,
+        total_price: acceptedReq.totalEarnings,
+      });
+    }
+
     confetti({
-      particleCount: 60,
+      particleCount: 70,
       spread: 60,
       origin: { y: 0.6 }
     });
@@ -155,12 +189,17 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
     await updateBookingStatusInSupabase(id, 'cancelled');
   };
 
+  const companionPhotos = [
+    userAvatar || localStorage.getItem('ck_user_avatar') || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    ...gallery,
+  ];
+
   return (
     <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 relative">
       <div className="max-w-6xl mx-auto">
         
         {/* Top Header */}
-        <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-5 sm:p-6 border border-pink-200 shadow-apple-md mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-5 sm:p-6 border border-pink-200 shadow-apple-md mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <button
               onClick={onBackToHome}
@@ -174,7 +213,7 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
             <div className="relative group">
               <div className="w-13 h-13 rounded-full overflow-hidden ring-2 ring-emerald-300 shadow-sm bg-emerald-50">
                 <img 
-                  src={userAvatar || localStorage.getItem('ck_user_avatar') || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'} 
+                  src={companionPhotos[0]} 
                   alt={userName} 
                   className="w-full h-full object-cover"
                 />
@@ -201,9 +240,20 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
                 <h1 className="text-xl sm:text-2xl font-bold text-[#1d1d1f]">
                   Partner Dashboard &bull; {userName}
                 </h1>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                  80% Payout Active
-                </span>
+                {kycVerified ? (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    <span>Verified Companion</span>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setFaceModalOpen(true)}
+                    className="text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1 transition"
+                  >
+                    <ShieldAlert className="w-3 h-3 text-amber-600" />
+                    <span>Verify Face (Required)</span>
+                  </button>
+                )}
               </div>
               <p className="text-xs text-[#86868b]">Manage client bookings, incoming requests &amp; earnings</p>
             </div>
@@ -245,6 +295,22 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
             )}
           </div>
         </div>
+
+        {/* INCOMING BOOKING ALERT BANNER */}
+        {newBookingAlert && (
+          <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-apple-md flex items-center justify-between animate-bounce">
+            <div className="flex items-center gap-2.5">
+              <Bell className="w-5 h-5 animate-pulse" />
+              <span className="text-xs sm:text-sm font-bold">{newBookingAlert}</span>
+            </div>
+            <button
+              onClick={() => setNewBookingAlert(null)}
+              className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-xs font-bold transition"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* SOS Emergency Button */}
         <div className="mb-6 flex justify-end">
@@ -323,7 +389,7 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
               <div className="flex items-center gap-2">
                 <ImageIcon className="w-5 h-5 text-[#0071e3]" />
                 <h2 className="text-lg font-bold text-[#1d1d1f]">
-                  My Companion Portfolio Photos
+                  My Companion Portfolio Photos ({companionPhotos.length}/3+)
                 </h2>
               </div>
               <p className="text-xs text-[#86868b] mt-0.5">
@@ -440,29 +506,69 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-3 md:pt-0 border-t md:border-t-0 border-pink-200">
-                    <div className="text-right sm:text-right">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-pink-200">
+                    <div className="text-right sm:text-right pr-2">
                       <div className="text-xs text-[#86868b]">Your Net 80% Payout</div>
                       <div className="text-xl font-bold text-emerald-600 tabular-numbers">
                         ₹{req.netPayout.toLocaleString('en-IN')}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {/* CONNECT ACTIONS: VIEW PROFILE, DIRECT CALL, IN-APP CHAT */}
+                    <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => setActiveProfileModal(req)}
+                        className="px-3 py-2 rounded-xl bg-pink-100/70 hover:bg-pink-100 text-[#1d1d1f] text-xs font-bold transition flex items-center gap-1"
+                        title="View Seeker Verified Photos & Profile"
+                      >
+                        <UserCheck className="w-3.5 h-3.5 text-[#0071e3]" />
+                        <span>Profile</span>
+                      </button>
+
+                      {req.seekerPhone && req.seekerPhone !== 'Protected' && (
+                        <a
+                          href={`tel:${req.seekerPhone}`}
+                          className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition flex items-center gap-1"
+                          title="Call Seeker Directly"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                          <span>Call</span>
+                        </a>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatTarget({
+                            name: req.seekerName,
+                            avatar: req.seekerAvatar,
+                            phone: req.seekerPhone,
+                            bookingCode: req.id.slice(0, 8),
+                          });
+                          setChatModalOpen(true);
+                        }}
+                        className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0071e3] border border-blue-200 text-xs font-bold transition flex items-center gap-1"
+                        title="Chat with Seeker"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Chat</span>
+                      </button>
+
                       <button
                         onClick={() => handleDeclineRequest(req.id)}
-                        className="flex-1 sm:flex-none p-2.5 rounded-full border border-pink-200 hover:bg-rose-50 text-rose-600 transition apple-focus flex items-center justify-center gap-1 text-xs font-bold"
+                        className="p-2 rounded-xl border border-pink-200 hover:bg-rose-50 text-rose-600 transition"
+                        title="Decline"
                       >
                         <XCircle className="w-4 h-4" />
-                        <span className="sm:hidden">Decline</span>
                       </button>
 
                       <button
                         onClick={() => handleAcceptRequest(req.id)}
-                        className="flex-1 sm:flex-none px-6 py-2.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white transition shadow-apple-sm text-xs font-bold flex items-center justify-center gap-1.5 apple-focus active:scale-95"
+                        className="px-4 py-2 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white transition shadow-apple-sm text-xs font-bold flex items-center gap-1 active:scale-95"
                       >
                         <CheckCircle2 className="w-4 h-4" />
-                        <span>Accept Booking</span>
+                        <span>Accept</span>
                       </button>
                     </div>
                   </div>
@@ -505,16 +611,73 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
                       {b.serviceTitle} &bull; {b.date} ({b.time}) &bull; {b.location}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-emerald-700 text-base">
-                      ₹{b.netPayout.toLocaleString('en-IN')}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChatTarget({
+                          name: b.seekerName,
+                          avatar: b.seekerAvatar,
+                          phone: b.seekerPhone,
+                          bookingCode: b.id.slice(0, 8),
+                        });
+                        setChatModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-bold flex items-center gap-1 shadow-xs hover:bg-emerald-50 transition"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Chat</span>
+                    </button>
+                    <div className="text-right">
+                      <div className="font-bold text-emerald-700 text-base">
+                        ₹{b.netPayout.toLocaleString('en-IN')}
+                      </div>
+                      <div className="text-[10px] text-[#86868b]">Direct bank transfer</div>
                     </div>
-                    <div className="text-[10px] text-[#86868b]">Direct bank transfer</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+        )}
+
+        {/* MODALS */}
+        <FaceVerificationModal
+          isOpen={faceModalOpen}
+          onClose={() => setFaceModalOpen(false)}
+          onVerified={() => setKycVerified(true)}
+          userName={userName}
+          userPhotos={companionPhotos}
+        />
+
+        <SeekerProfileModal
+          isOpen={Boolean(activeProfileModal)}
+          onClose={() => setActiveProfileModal(null)}
+          booking={activeProfileModal}
+          onOpenChat={() => {
+            if (activeProfileModal) {
+              setChatTarget({
+                name: activeProfileModal.seekerName,
+                avatar: activeProfileModal.seekerAvatar,
+                phone: activeProfileModal.seekerPhone,
+                bookingCode: activeProfileModal.id.slice(0, 8),
+              });
+              setChatModalOpen(true);
+            }
+          }}
+          onAccept={(id) => handleAcceptRequest(id)}
+        />
+
+        {chatTarget && (
+          <ChatModal
+            isOpen={chatModalOpen}
+            onClose={() => setChatModalOpen(false)}
+            bookingCode={chatTarget.bookingCode}
+            otherPartyName={chatTarget.name}
+            otherPartyAvatar={chatTarget.avatar}
+            otherPartyPhone={chatTarget.phone}
+            currentRole="companion"
+          />
         )}
 
       </div>

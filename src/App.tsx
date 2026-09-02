@@ -23,9 +23,11 @@ import { subscribeToAuthChanges } from './services/firebase';
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'landing' | 'seeker' | 'companion'>('landing');
-  const [userRole, setUserRole] = useState<UserRole>('seeker');
-  const [userName, setUserName] = useState<string>(() => {
-    return localStorage.getItem('ck_user_name') || 'vaibhav';
+  const [userRole, setUserRole] = useState<UserRole | null>(() => {
+    return (localStorage.getItem('ck_user_role') as UserRole) || null;
+  });
+  const [userName, setUserName] = useState<string | null>(() => {
+    return localStorage.getItem('ck_user_name') || null;
   });
   const [userAvatar, setUserAvatar] = useState<string>(() => {
     return localStorage.getItem('ck_user_avatar') || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80';
@@ -73,8 +75,11 @@ export const App: React.FC = () => {
 
   const handleRoleSelected = (role: UserRole, name: string, avatarUrl?: string) => {
     setUserRole(role);
-    setUserName(name || 'vaibhav');
+    if (role) {
+      localStorage.setItem('ck_user_role', role);
+    }
     if (name) {
+      setUserName(name);
       localStorage.setItem('ck_user_name', name);
     }
     if (avatarUrl) {
@@ -93,10 +98,14 @@ export const App: React.FC = () => {
     if (mode === 'landing') {
       setCurrentView('landing');
     } else {
-      if (!userRole) {
-        setUserRole(mode);
-        if (!userName) setUserName('vaibhav');
+      // If guest has not signed in, prompt login first
+      if (!userName) {
+        setAuthModalMode('signin');
+        setAuthModalOpen(true);
+        return;
       }
+      setUserRole(mode);
+      localStorage.setItem('ck_user_role', mode);
       setCurrentView(mode);
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -104,9 +113,13 @@ export const App: React.FC = () => {
 
   const handleLogout = () => {
     setUserRole(null);
-    setUserName('');
+    setUserName(null);
     localStorage.removeItem('ck_user_role');
     localStorage.removeItem('ck_user_name');
+    localStorage.removeItem('ck_user_email');
+    localStorage.removeItem('ck_user_phone');
+    localStorage.removeItem('ck_user_avatar');
+    localStorage.removeItem('ck_kyc_verified');
     setCurrentView('landing');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -189,8 +202,8 @@ export const App: React.FC = () => {
         onOpenPartnerJoin={handleOpenPartnerJoin}
         onOpenSearch={handleOpenSearchModal}
         onOpenAuth={handleOpenAuth}
-        currentRole={userRole}
-        userName={userName}
+        currentRole={userRole || undefined}
+        userName={userName || undefined}
         userAvatar={userAvatar}
         onUpdateAvatar={handleUpdateAvatar}
         onLogout={handleLogout}
@@ -201,7 +214,7 @@ export const App: React.FC = () => {
       {/* VIEW 1: SEEKER SWIPE DASHBOARD */}
       {currentView === 'seeker' && (
         <SeekerDashboard 
-          userName={userName || 'vaibhav'}
+          userName={userName || 'Seeker'}
           userAvatar={userAvatar}
           onUpdateAvatar={(newAvatar) => {
             setUserAvatar(newAvatar);
@@ -304,7 +317,7 @@ export const App: React.FC = () => {
         isOpen={bookingModalOpen}
         onClose={() => setBookingModalOpen(false)}
         initialContext={bookingContext}
-        userName={userName}
+        userName={userName || undefined}
       />
 
       <PartnerJoinModal 
