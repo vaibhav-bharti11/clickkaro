@@ -5,9 +5,9 @@ export const StatsBar: React.FC = () => {
   const stats = [
     {
       icon: Users,
-      value: 'Millions+',
-      label: 'Registered Partners',
-      sublabel: 'Across all Indian metros & towns',
+      value: '1,000+',
+      label: 'Curated Partners',
+      sublabel: 'Across Delhi NCR, Mumbai & premier hubs',
       color: 'from-[#FF2D55] to-[#E11D48]',
       textColor: 'text-[#FF2D55]',
       bgLight: 'bg-[#FF2D55]/10',
@@ -15,9 +15,9 @@ export const StatsBar: React.FC = () => {
     },
     {
       icon: MapPin,
-      value: '19,000+',
-      label: 'Indian Pin Codes',
-      sublabel: '700+ districts in 28 states & 8 UTs',
+      value: '12+',
+      label: 'Launch Metros',
+      sublabel: 'Delhi NCR, Mumbai, Bangalore, Jaipur & more',
       color: 'from-[#FF5E3A] to-[#F59E0B]',
       textColor: 'text-[#FF5E3A]',
       bgLight: 'bg-[#FF5E3A]/10',
