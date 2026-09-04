@@ -66,7 +66,7 @@ export interface PartnerFormData {
   availableHoursPerWeek: number;
 }
 
-export type UserRole = 'seeker' | 'companion' | null;
+export type UserRole = 'seeker' | 'companion' | 'user' | null;
 
 export interface SeekerProfile {
   id: string;
@@ -112,7 +112,9 @@ export interface BookingRequest {
   pinCode: string;
   totalEarnings: number;
   netPayout: number;
-  status: 'pending' | 'accepted' | 'declined' | 'completed';
+  status: 'pending' | 'accepted' | 'ongoing' | 'declined' | 'completed';
+  completionOtp?: string;
+  payoutReleased?: boolean;
   createdAt: string;
 }
 
@@ -124,3 +126,19 @@ export interface BookingContext {
   companionAvatar?: string;
   companionRate?: number;
 }
+
+export interface ServiceCredit {
+  id: string;
+  serviceId: string;
+  serviceName: string;
+  displayTitle: string;
+  price: string;
+  priceNum: number;
+  purchasedDate: string;
+  bookingCode?: string;
+  status: 'available' | 'used';
+  bookedCompanion?: string;
+  bookedCompanionAvatar?: string;
+  bookedDate?: string;
+}
+

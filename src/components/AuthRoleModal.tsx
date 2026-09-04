@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserRole } from '../types';
-import { X, Search, ShieldCheck, Sparkles, ArrowRight, CheckCircle2, Phone, KeyRound, AlertCircle, Loader2, Mail, Lock } from 'lucide-react';
+import { X, Search, ShieldCheck, ArrowRight, CheckCircle2, Phone, KeyRound, AlertCircle, Loader2, Mail, Lock } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { signInWithGoogle, sendPhoneOtp, verifyPhoneOtp, initPhoneRecaptcha, signInWithEmailPassword, signUpWithEmailPassword, AuthUserProfile } from '../services/firebase';
 import { saveClientToSupabase, checkExistingClient } from '../services/supabase';
@@ -40,7 +40,6 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
   const [pinCode, setPinCode] = useState(() => localStorage.getItem('ck_user_pincode') || '110001');
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinSuccess, setPinSuccess] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState<'seeker' | 'companion'>('seeker');
   const [avatarPhoto, setAvatarPhoto] = useState<string>(() => localStorage.getItem('ck_user_avatar') || PRESET_AVATARS[0]);
   const [firebaseUid, setFirebaseUid] = useState<string>(() => localStorage.getItem('ck_firebase_uid') || '');
 
@@ -98,7 +97,6 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
           if (existing.phone) setPhone(existing.phone);
           if (existing.city) setCity(existing.city);
           if (existing.pin_code) setPinCode(existing.pin_code);
-          if (existing.role) setSelectedRole(existing.role);
         }
       }
     } catch (e) {
@@ -328,67 +326,33 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
       setErrorMsg('Please provide a valid 10-digit mobile number for booking confirmations.');
       return;
     }
-    if (pinCode.length === 6) {
-      const res = validatePincode(pinCode);
-      if (!res.isLaunchCity) {
-        setPinError(`PIN code ${pinCode} is outside our 12 launch cities.`);
-        return;
-      }
-    }
 
     setLoading(true);
     setErrorMsg(null);
 
-    localStorage.setItem('ck_user_name', fullName);
+    const finalName = fullName || 'Member';
+    localStorage.setItem('ck_user_name', finalName);
     localStorage.setItem('ck_user_phone', phone);
     localStorage.setItem('ck_user_city', city);
     localStorage.setItem('ck_user_pincode', pinCode);
-
-    await saveClientToSupabase({
-      firebase_uid: firebaseUid || localStorage.getItem('ck_firebase_uid') || undefined,
-      auth_provider: authMethod,
-      full_name: fullName,
-      phone: phone,
-      email: email || null,
-      avatar_url: avatarPhoto,
-      role: selectedRole,
-      city: city,
-      pin_code: pinCode,
-    });
-
-    setLoading(false);
-    setStep('role');
-  };
-
-  const handleRoleConfirm = async () => {
-    confetti({
-      particleCount: 70,
-      spread: 60,
-      origin: { y: 0.6 }
-    });
-
-    const finalName = fullName || 'Client';
-    localStorage.setItem('ck_user_role', selectedRole);
-    localStorage.setItem('ck_user_name', finalName);
     localStorage.setItem('ck_user_avatar', avatarPhoto);
-    localStorage.setItem('ck_user_city', city);
-    localStorage.setItem('ck_user_pincode', pinCode);
-    if (phone) localStorage.setItem('ck_user_phone', phone);
-    if (email) localStorage.setItem('ck_user_email', email);
+    localStorage.setItem('ck_user_role', 'user');
 
     await saveClientToSupabase({
       firebase_uid: firebaseUid || localStorage.getItem('ck_firebase_uid') || undefined,
       auth_provider: authMethod,
       full_name: finalName,
-      phone: phone || '+91 98765 43210',
+      phone: phone,
       email: email || null,
       avatar_url: avatarPhoto,
-      role: selectedRole,
+      role: 'user',
       city: city,
       pin_code: pinCode,
     });
 
-    onSelectRole(selectedRole, finalName, avatarPhoto);
+    setLoading(false);
+    confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+    onSelectRole('user', finalName, avatarPhoto);
     onClose();
   };
 
@@ -802,95 +766,12 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#0071e3] hover:bg-[#0077ed] text-white py-3 rounded-full font-bold text-xs sm:text-sm transition shadow-sm flex items-center justify-center gap-2 apple-focus cursor-pointer mt-2"
+                className="w-full bg-[#0071e3] hover:bg-[#0077ed] text-white py-3.5 rounded-full font-bold text-xs sm:text-sm transition shadow-sm flex items-center justify-center gap-2 apple-focus cursor-pointer mt-2"
               >
-                <span>Continue to Role Choice</span>
+                <span>Complete &amp; Enter Dashboard</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
-          </div>
-        )}
-
-        {/* STEP 3: ROLE SELECTION */}
-        {step === 'role' && (
-          <div>
-            <div className="text-center mb-6">
-              <span className="text-[11px] font-bold text-[#0071e3] uppercase tracking-wider block mb-1">
-                Step 2 of 2
-              </span>
-              <h2 className="text-2xl font-bold text-[#1d1d1f] tracking-tight font-display">
-                Choose Your Portal
-              </h2>
-              <p className="text-xs text-[#86868b] mt-1 font-sans">
-                You can switch between both modes anytime from the top bar
-              </p>
-            </div>
-
-            <div className="space-y-3 mb-6">
-              {/* Option 1: Seeker */}
-              <div
-                onClick={() => setSelectedRole('seeker')}
-                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-3.5 ${
-                  selectedRole === 'seeker'
-                    ? 'border-[#0071e3] bg-blue-50/50 shadow-sm'
-                    : 'border-pink-200/80 bg-white hover:border-pink-300'
-                }`}
-              >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                  selectedRole === 'seeker' ? 'bg-[#0071e3] text-white' : 'bg-pink-100 text-pink-700'
-                }`}>
-                  <Search className="w-5 h-5" />
-                </div>
-                <div className="text-left flex-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-bold text-[#1d1d1f]">I Want to Book Companions</h4>
-                    {selectedRole === 'seeker' && (
-                      <CheckCircle2 className="w-4 h-4 text-[#0071e3]" />
-                    )}
-                  </div>
-                  <p className="text-xs text-[#86868b] mt-0.5">
-                    Browse verified profiles in {city}, swipe match, or book dinner, movie, and hangout dates
-                  </p>
-                </div>
-              </div>
-
-              {/* Option 2: Companion */}
-              <div
-                onClick={() => setSelectedRole('companion')}
-                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-3.5 ${
-                  selectedRole === 'companion'
-                    ? 'border-[#1d1d1f] bg-stone-50 shadow-sm'
-                    : 'border-pink-200/80 bg-white hover:border-pink-300'
-                }`}
-              >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                  selectedRole === 'companion' ? 'bg-[#1d1d1f] text-white' : 'bg-stone-100 text-stone-700'
-                }`}>
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div className="text-left flex-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-bold text-[#1d1d1f]">I Want to Be a Companion</h4>
-                    {selectedRole === 'companion' && (
-                      <CheckCircle2 className="w-4 h-4 text-[#1d1d1f]" />
-                    )}
-                  </div>
-                  <p className="text-xs text-[#86868b] mt-0.5">
-                    Accept verified bookings, chat with clients, and earn 80% (up to ₹2,000/hr)
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleRoleConfirm}
-              disabled={loading}
-              className="w-full bg-[#1d1d1f] hover:bg-[#0071e3] text-white py-3.5 rounded-full font-bold text-xs sm:text-sm transition shadow-apple-sm flex items-center justify-center gap-2 active:scale-98 apple-focus cursor-pointer"
-            >
-              <span>Launch {selectedRole === 'seeker' ? 'Seeker Hub' : 'Partner Dashboard'}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
           </div>
         )}
 

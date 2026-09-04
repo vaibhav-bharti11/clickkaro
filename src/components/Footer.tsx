@@ -49,10 +49,10 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
                 />
               </div>
               <p className="mb-3 text-[11px] text-[#86868b] leading-relaxed">
-                India's #1 Social &amp; Lifestyle Support Platform. Safe, verified, consent-first companionship across 12 designated launch hubs.
+                India's #1 Social &amp; Lifestyle Support Platform. Safe, verified, consent-first companionship across premier cities in India.
               </p>
               <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-pink-50 text-[#1d1d1f] text-[10px] font-semibold border border-pink-200">
-                <ShieldCheck className="w-3 h-3 text-[#0071e3]" /> 100% Aadhaar KYC
+                <ShieldCheck className="w-3 h-3 text-[#0071e3]" /> 100% Face Verified
               </div>
             </div>
 
@@ -74,12 +74,12 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
               <h4 className="text-[#1d1d1f] font-bold text-xs tracking-tight">
                 Platform
               </h4>
-              <a href="#launch-cities" className="hover:text-[#0071e3] transition">12 Launch Cities</a>
-              <a href="#launch-cities" className="hover:text-[#0071e3] transition">Pin Code Checker</a>
+              <a href="#cities" className="hover:text-[#0071e3] transition">Cities &amp; Coverage</a>
+              <a href="#cities" className="hover:text-[#0071e3] transition">Pin Code Checker</a>
               <a href="#earnings" className="hover:text-[#0071e3] transition">Earnings Calculator</a>
               <a href="#pricing" className="hover:text-[#0071e3] transition">Membership Plans</a>
               <button onClick={onOpenBooking} className="hover:text-[#0071e3] transition text-left text-xs">Find a Companion</button>
-              <button onClick={onOpenPartnerJoin} className="hover:text-[#0071e3] transition text-left text-xs text-[#0071e3] font-semibold">Become a Partner</button>
+              <button onClick={onOpenPartnerJoin} className="hover:text-[#0071e3] transition text-left text-xs text-[#0071e3] font-semibold">Become a Companion</button>
             </div>
 
             {/* Company */}
@@ -101,7 +101,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
               </h4>
               <a href="#faq" className="hover:text-[#0071e3] transition">Help Center</a>
               <a href="#faq" className="hover:text-[#0071e3] transition">24/7 Safety SOS</a>
-              <a href="#faq" className="hover:text-[#0071e3] transition">KYC Verification</a>
+              <a href="#faq" className="hover:text-[#0071e3] transition">Face Verification</a>
               <span className="text-[11px] text-[#86868b] mt-1">support@clickkarodatekaro.in</span>
             </div>
 
@@ -115,7 +115,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span>12 Launch Cities Active</span>
+                <span>Active Cities Network</span>
               </div>
               <span>&bull;</span>
               <span className="flex items-center gap-1">

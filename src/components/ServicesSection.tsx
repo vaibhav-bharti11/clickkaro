@@ -5,9 +5,12 @@ import { ArrowRight, Clock, ShieldCheck, Check, Sparkles, Compass } from 'lucide
 
 interface ServicesSectionProps {
   onSelectService: (service: ServiceItem) => void;
+  isLoggedIn?: boolean;
+  onOpenAuth?: (mode?: 'signin' | 'signup') => void;
+  onNavigateSeeker?: () => void;
 }
 
-// Map each of the 6 official client services to its dedicated 8K asset, accent color, and vibe details
+// Map each of the 6 official client services to its dedicated asset, accent color, and vibe details
 const SERVICE_VISUALS: Record<string, {
   image: string;
   gradient: string;
@@ -16,42 +19,42 @@ const SERVICE_VISUALS: Record<string, {
   highlights: string[];
 }> = {
   'hangout': {
-    image: '/assets/hangout_bg.jpg',
+    image: '/assets/hangout_light_bg.jpg',
     gradient: 'from-[#FF5E3A] to-[#FF2A68]',
     glow: 'rgba(255, 94, 58, 0.35)',
     badgeColor: 'bg-orange-500/20 text-orange-200 border-orange-400/30',
-    highlights: ['Outdoor amphitheaters & parks', 'Zero social pressure', '100% KYC verified buddy'],
+    highlights: ['Outdoor amphitheaters & parks', 'Zero social pressure', '100% Face Verified companion'],
   },
   'movie-partner': {
-    image: '/assets/cinema_nights_bg.jpg',
+    image: '/assets/cinema_light_bg.jpg',
     gradient: 'from-[#8B5CF6] to-[#EC4899]',
     glow: 'rgba(139, 92, 246, 0.35)',
     badgeColor: 'bg-purple-500/20 text-purple-200 border-purple-400/30',
     highlights: ['Blockbusters, IMAX & festivals', 'Cinema ticket sharing buddy', 'Post-show discussions'],
   },
   'clubbing': {
-    image: '/assets/weekend_parties_bg.jpg',
+    image: '/assets/dining_light_bg.jpg',
     gradient: 'from-[#FF2D55] to-[#7928CA]',
     glow: 'rgba(255, 45, 85, 0.4)',
     badgeColor: 'bg-pink-500/20 text-pink-200 border-pink-400/30',
     highlights: ['Rooftop lounges & clubbing', 'Charismatic nightlife wing-partner', '24/7 in-app SOS protection'],
   },
   'lunch-dinner': {
-    image: '/assets/lunch_dinner_bg.jpg',
+    image: '/assets/dining_light_bg.jpg',
     gradient: 'from-[#F59E0B] to-[#EF4444]',
     glow: 'rgba(245, 158, 11, 0.35)',
     badgeColor: 'bg-amber-500/20 text-amber-200 border-amber-400/30',
     highlights: ['Gourmet dining & chef bistros', 'Aesthetic restaurant companion', 'Delightful dinner dialogue'],
   },
   'travel-partner': {
-    image: '/assets/city_roadtrips_bg.jpg',
+    image: '/assets/hangout_light_bg.jpg',
     gradient: 'from-[#0071E3] to-[#00C7BE]',
     glow: 'rgba(0, 113, 227, 0.4)',
     badgeColor: 'bg-blue-500/20 text-blue-200 border-blue-400/30',
-    highlights: ['Full 12-hour itinerary package', 'Scenic road trips & getaways', 'Safe, background-verified co-traveler'],
+    highlights: ['Full 12-hour itinerary package', 'Scenic road trips & getaways', 'Safe, Face Verified co-traveler'],
   },
   'coffee-partner': {
-    image: '/assets/cafe_outings_bg.jpg',
+    image: '/assets/cafe_light_bg.jpg',
     gradient: 'from-[#EC4899] to-[#FB923C]',
     glow: 'rgba(236, 72, 153, 0.35)',
     badgeColor: 'bg-rose-500/20 text-rose-200 border-rose-400/30',
@@ -59,7 +62,12 @@ const SERVICE_VISUALS: Record<string, {
   },
 };
 
-export const ServicesSection: React.FC<ServicesSectionProps> = ({ onSelectService }) => {
+export const ServicesSection: React.FC<ServicesSectionProps> = ({ 
+  onSelectService,
+  isLoggedIn = false,
+  onOpenAuth,
+  onNavigateSeeker,
+}) => {
   const [activeFilter, setActiveFilter] = useState<'all' | 'day' | 'night'>('all');
 
   const filteredServices = useMemo(() => {
@@ -212,12 +220,20 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ onSelectServic
                     </div>
                   </div>
 
-                  {/* 3. High-Contrast Interactive CTA Button */}
+                  {/* 3. High-Contrast Interactive CTA Button (Auth Guarded) */}
                   <div className="pt-2">
                     <button
                       type="button"
-                      onClick={() => onSelectService(service)}
-                      className={`w-full py-3.5 px-6 rounded-full text-white font-bold text-xs sm:text-sm transition-all duration-300 shadow-apple-md hover:shadow-apple-lg active:scale-[0.98] apple-focus flex items-center justify-center gap-2 bg-gradient-to-r ${visual.gradient} group-hover:brightness-105`}
+                      onClick={() => {
+                        if (!isLoggedIn) {
+                          if (onOpenAuth) onOpenAuth('signin');
+                          else onSelectService(service);
+                        } else {
+                          if (onNavigateSeeker) onNavigateSeeker();
+                          else onSelectService(service);
+                        }
+                      }}
+                      className={`w-full py-3.5 px-6 rounded-full text-white font-bold text-xs sm:text-sm transition-all duration-300 shadow-apple-md hover:shadow-apple-lg active:scale-[0.98] apple-focus flex items-center justify-center gap-2 bg-gradient-to-r ${visual.gradient} group-hover:brightness-105 cursor-pointer`}
                     >
                       <span>Book {service.title} ({service.duration})</span>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -233,27 +249,27 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ onSelectServic
         </div>
 
         {/* Bottom Trust & City Dispatch Bar */}
-        <div className="mt-16 bg-white/95 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border border-black/10 shadow-apple-float flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="mt-16 bg-white/95 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border border-pink-200 shadow-apple-float flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#0071E3] to-[#00C7BE] text-white flex items-center justify-center shrink-0 shadow-md">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
               <div className="text-sm font-display font-extrabold text-[#1d1d1f] tracking-tight">
-                100% Aadhaar Verified &bull; Strict Consent Guidelines
+                100% Face Verified &bull; Strict Consent Guidelines
               </div>
               <div className="text-xs text-[#86868b] font-sans mt-0.5">
-                Every companion is identity-checked with 24/7 in-app emergency SOS protection in all 12 launch cities.
+                Every companion is face-verified with 24/7 in-app emergency SOS protection in all operational cities.
               </div>
             </div>
           </div>
 
           <a
-            href="#launch-cities"
+            href="#cities"
             className="shrink-0 px-6 py-3 rounded-full bg-[#1d1d1f] hover:bg-[#0071E3] text-white text-xs font-bold transition shadow-sm hover:shadow-md active:scale-95 flex items-center gap-2"
           >
             <Compass className="w-4 h-4 text-[#00C7BE]" />
-            <span>Explore 12 Launch Cities</span>
+            <span>Explore Active Cities</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </a>
         </div>

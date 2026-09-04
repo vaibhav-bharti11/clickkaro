@@ -7,11 +7,11 @@ export const WhyChooseUs: React.FC = () => {
   const steps = [
     {
       num: '01.',
-      title: '100% Aadhaar & KYC Verification',
-      subtitle: 'Every companion is thoroughly screened with Government IDs (Aadhaar/PAN) and background checks before ever appearing on our network.',
-      pillText: 'Identity Checked',
+      title: '100% AI Face Verification',
+      subtitle: 'Every companion undergoes secure live AI Face Verification and identity verification before ever appearing on our network.',
+      pillText: 'Face Verified',
       chatSender: 'Priya Sharma (Verified)',
-      chatText: '“Hi! My ID verification and background check is completed. Looking forward to our movie meetup!”',
+      chatText: '“Hi! My face verification is completed. Looking forward to our movie meetup!”',
     },
     {
       num: '02.',
@@ -23,11 +23,11 @@ export const WhyChooseUs: React.FC = () => {
     },
     {
       num: '03.',
-      title: 'Hyperlocal 19,000+ Pin Code Matching',
-      subtitle: 'Whether you are in Delhi, Mumbai, Bengaluru, or Tier-2 & Tier-3 towns, find vetted companions near your exact location in under 15 minutes.',
-      pillText: 'Hyperlocal Reach',
-      chatSender: 'Matching Engine',
-      chatText: '“Found 18+ verified companions available in Pin Code 110001 within 2 km radius.”',
+      title: 'Direct Verified Companion Connect',
+      subtitle: 'Whether you are in Delhi, Mumbai, Bengaluru, or other popular cities, discover vetted companions near your location easily and securely.',
+      pillText: 'Direct Connect',
+      chatSender: 'Companion Concierge',
+      chatText: '“Found verified companions available in your location ready for instant connection.”',
     },
   ];
 

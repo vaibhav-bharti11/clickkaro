@@ -7,7 +7,7 @@ interface PricingSectionProps {
   onOpenPartnerJoin: () => void;
 }
 
-export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenBooking, onOpenPartnerJoin }) => {
+export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenBooking, onOpenPartnerJoin: _onOpenPartnerJoin }) => {
   const [activePlanType, setActivePlanType] = useState<'subscription' | 'hourly'>('subscription');
 
   return (
@@ -56,59 +56,43 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenBooking, o
 
         {/* Plan Cards Grid */}
         {activePlanType === 'subscription' ? (
-          <div className="w-full grid grid-cols-1 lg:grid-cols-3 border border-black/10 rounded-3xl overflow-hidden bg-white/90 backdrop-blur-2xl shadow-apple-float mb-12">
-            {MEMBERSHIP_PLANS.map((plan, idx) => (
+          <div className="w-full max-w-xl mx-auto border border-pink-200/80 rounded-3xl overflow-hidden bg-white/95 backdrop-blur-2xl shadow-apple-float mb-12">
+            {MEMBERSHIP_PLANS.map((plan) => (
               <div 
                 key={plan.id}
-                className={`p-8 sm:p-10 flex flex-col justify-between transition-colors group relative ${
-                  plan.popular ? 'bg-gradient-to-b from-pink-50/70 via-white to-white lg:border-x border-black/10 shadow-sm' : 'hover:bg-pink-50/20'
-                } ${idx < MEMBERSHIP_PLANS.length - 1 ? 'border-b lg:border-b-0 border-black/10' : ''}`}
+                className="p-8 sm:p-10 flex flex-col justify-between bg-gradient-to-b from-pink-50/60 via-white to-white relative"
               >
                 <div>
                   <div className="flex justify-between items-center mb-4 min-h-[28px]">
                     <span className="text-xs font-bold text-[#1d1d1f] uppercase tracking-wider font-sans">{plan.duration}</span>
-                    {plan.popular && (
-                      <span className="text-[10px] font-black text-white bg-gradient-to-r from-[#FF2D55] to-[#FF5E3A] px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">
-                        Official Client Pass
-                      </span>
-                    )}
+                    <span className="text-[10px] font-black text-white bg-gradient-to-r from-[#FF2D55] to-[#FF5E3A] px-3.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                      Official Client Pass
+                    </span>
                   </div>
 
                   <div className="mb-6">
                     <div className="flex items-baseline gap-2 mb-1">
-                      <h3 className="text-4xl sm:text-5xl font-display font-extrabold text-[#1d1d1f] tabular-numbers">
+                      <h3 className="text-5xl font-display font-extrabold text-[#1d1d1f] tabular-numbers">
                         ₹{plan.discountedPrice}
                       </h3>
-                      <span className="text-sm text-[#86868b] line-through tabular-numbers">
+                      <span className="text-base text-[#86868b] line-through tabular-numbers">
                         ₹{plan.regularPrice}
                       </span>
-                      <span className="text-xs text-[#86868b] font-normal">/ {plan.id.includes('3-months') ? '3 Months' : 'term'}</span>
+                      <span className="text-xs text-[#86868b] font-normal">/ 3 Months Access</span>
                     </div>
                     <div className="text-xs font-bold text-[#FF2D55] tracking-tight mb-1">
-                      {plan.id.includes('3-months') ? '₹999/- for 3 Months Full Access' : plan.discountPercentage}
+                      Only ₹999 for 3 Months Full Access (No other subscription)
                     </div>
                     <p className="text-xs text-[#86868b] leading-relaxed font-sans">
-                      {plan.id.includes('3-months')
-                        ? 'Unlimited bookings across all 12 launch cities for all 6 official services with zero platform surcharges.'
-                        : 'Active registered partner profile with direct weekly automated bank settlements.'}
+                      Unlimited companion bookings across all cities in India for all 6 official services with zero platform surcharges.
                     </p>
                   </div>
 
                   <button
-                    onClick={() => {
-                      if (plan.id.includes('3-months')) {
-                        onOpenBooking();
-                      } else {
-                        onOpenPartnerJoin();
-                      }
-                    }}
-                    className={`block w-full py-3.5 rounded-full mb-8 font-bold text-xs transition-all shadow-md text-center apple-focus active:scale-95 ${
-                      plan.popular
-                        ? 'bg-gradient-to-r from-[#FF2D55] to-[#E11D48] hover:opacity-95 text-white shadow-pink-500/25'
-                        : 'bg-[#1d1d1f] hover:bg-[#0071E3] text-white'
-                    }`}
+                    onClick={() => onOpenBooking()}
+                    className="block w-full py-4 rounded-full mb-8 font-bold text-sm transition-all shadow-md text-center apple-focus active:scale-95 bg-gradient-to-r from-[#FF2D55] to-[#E11D48] hover:opacity-95 text-white shadow-pink-500/25"
                   >
-                    {plan.id.includes('3-months') ? 'Get 3 Months Subscription (₹999)' : `Activate ${plan.duration}`}
+                    Get 3 Months Full Access (₹999)
                   </button>
 
                   <div className="flex items-center gap-4 mb-6 relative">
@@ -130,9 +114,9 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onOpenBooking, o
                   </ul>
                 </div>
 
-                <div className="pt-4 border-t border-black/5 text-[11px] text-[#86868b] flex items-center gap-1.5 font-sans">
+                <div className="pt-4 border-t border-black/5 text-[11px] text-[#86868b] flex items-center justify-center gap-1.5 font-sans">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#0071E3]" />
-                  <span>100% Aadhaar KYC Fast-Track Match</span>
+                  <span>100% Face Verified Companion Guarantee</span>
                 </div>
               </div>
             ))}

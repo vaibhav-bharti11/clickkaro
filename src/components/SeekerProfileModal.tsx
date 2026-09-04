@@ -1,12 +1,11 @@
 import React from 'react';
-import { X, Phone, MessageSquare, ShieldCheck, CheckCircle2, MapPin, Calendar, Clock, Sparkles } from 'lucide-react';
+import { X, ShieldCheck, CheckCircle2, MapPin, Calendar, Clock, Sparkles } from 'lucide-react';
 import { BookingRequest } from '../types';
 
 interface SeekerProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   booking: BookingRequest | null;
-  onOpenChat: () => void;
   onAccept: (bookingId: string) => void;
 }
 
@@ -14,7 +13,6 @@ export const SeekerProfileModal: React.FC<SeekerProfileModalProps> = ({
   isOpen,
   onClose,
   booking,
-  onOpenChat,
   onAccept,
 }) => {
   if (!isOpen || !booking) return null;
@@ -35,7 +33,7 @@ export const SeekerProfileModal: React.FC<SeekerProfileModalProps> = ({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 w-8 h-8 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-[#1d1d1f] transition"
+          className="absolute top-5 right-5 w-8 h-8 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-[#1d1d1f] transition cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -63,7 +61,7 @@ export const SeekerProfileModal: React.FC<SeekerProfileModalProps> = ({
 
           <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold mt-2 border border-emerald-200">
             <Sparkles className="w-3 h-3" />
-            <span>100% Aadhaar &amp; Face KYC Verified</span>
+            <span>100% Face KYC Verified</span>
           </div>
         </div>
 
@@ -107,38 +105,15 @@ export const SeekerProfileModal: React.FC<SeekerProfileModalProps> = ({
           </div>
         </div>
 
-        {/* INTERACTIVE ACTIONS */}
-        <div className="space-y-2.5">
-          <div className="grid grid-cols-2 gap-2">
-            {booking.seekerPhone && booking.seekerPhone !== 'Protected' && (
-              <a
-                href={`tel:${booking.seekerPhone}`}
-                className="py-3 px-4 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs flex items-center justify-center gap-2 transition"
-              >
-                <Phone className="w-4 h-4" />
-                <span>Call Client</span>
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onOpenChat();
-              }}
-              className="py-3 px-4 rounded-2xl bg-blue-50 hover:bg-blue-100 text-[#0071e3] border border-blue-200 font-bold text-xs flex items-center justify-center gap-2 transition"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>In-App Chat</span>
-            </button>
-          </div>
-
+        {/* INTERACTIVE ACTIONS (Chat and call removed per instructions) */}
+        <div>
           <button
             type="button"
             onClick={() => {
               onAccept(booking.id);
               onClose();
             }}
-            className="w-full bg-[#0071e3] hover:bg-[#0077ed] text-white py-3.5 rounded-full font-bold text-xs sm:text-sm transition shadow-apple-sm flex items-center justify-center gap-2 active:scale-98"
+            className="w-full bg-[#0071e3] hover:bg-[#0077ed] text-white py-3.5 rounded-full font-bold text-xs sm:text-sm transition shadow-apple-sm flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>Confirm &amp; Accept Booking</span>
@@ -149,3 +124,4 @@ export const SeekerProfileModal: React.FC<SeekerProfileModalProps> = ({
     </div>
   );
 };
+export default SeekerProfileModal;

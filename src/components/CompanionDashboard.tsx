@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BookingRequest } from '../types';
-import { TrendingUp, CheckCircle2, XCircle, Clock, ShieldCheck, ArrowLeft, Sparkles, MapPin, DollarSign, Calendar, AlertTriangle, LogOut, Camera, Plus, Trash2, Image as ImageIcon, MessageSquare, Phone, UserCheck, Bell, ShieldAlert } from 'lucide-react';
+import { TrendingUp, CheckCircle2, XCircle, Clock, ShieldCheck, ArrowLeft, Sparkles, MapPin, DollarSign, Calendar, AlertTriangle, LogOut, Camera, Plus, Trash2, Image as ImageIcon, UserCheck, Bell, ShieldAlert, Mail, KeyRound, Lock } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { fetchCompanionRequestsFromSupabase, updateBookingStatusInSupabase, updateUserAvatarInSupabase, sendBookingConfirmationEmail } from '../services/supabase';
+import { fetchCompanionRequestsFromSupabase, updateBookingStatusInSupabase, updateUserAvatarInSupabase, sendBookingConfirmationEmail, verifyCompletionOtpAndReleasePayout } from '../services/supabase';
 import { SeekerProfileModal } from './SeekerProfileModal';
-import { ChatModal } from './ChatModal';
 import { FaceVerificationModal } from './FaceVerificationModal';
 
 interface CompanionDashboardProps {
@@ -29,13 +28,18 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
   const [sosActive, setSosActive] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [newBookingAlert, setNewBookingAlert] = useState<string | null>(null);
+  const [acceptedEmailSent, setAcceptedEmailSent] = useState<{ seekerName: string; email: string; phone: string; bookingCode: string } | null>(null);
 
   // Verification & Modals state
   const [kycVerified, setKycVerified] = useState(() => localStorage.getItem('ck_kyc_verified') === 'true');
   const [faceModalOpen, setFaceModalOpen] = useState(false);
   const [activeProfileModal, setActiveProfileModal] = useState<BookingRequest | null>(null);
-  const [chatModalOpen, setChatModalOpen] = useState(false);
-  const [chatTarget, setChatTarget] = useState<{ name: string; avatar?: string; phone?: string; bookingCode: string } | null>(null);
+
+  // OTP Verification Modal state for completing outings & releasing escrow funds
+  const [otpModalBooking, setOtpModalBooking] = useState<BookingRequest | null>(null);
+  const [enteredOtp, setEnteredOtp] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
   // Gallery state for portfolio photos
   const [gallery, setGallery] = useState<string[]>(() => {
@@ -117,7 +121,15 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
           pinCode: b.pin_code,
           totalEarnings: Number(b.total_price),
           netPayout: Math.round(Number(b.total_price) * 0.8),
-          status: (b.status === 'confirmed' ? 'accepted' : b.status === 'cancelled' ? 'declined' : 'pending') as any,
+          status: (b.status === 'completed'
+            ? 'completed'
+            : (b.status === 'confirmed' || b.status === 'ongoing' || b.status === 'in_progress')
+            ? 'ongoing'
+            : b.status === 'cancelled'
+            ? 'declined'
+            : 'pending') as any,
+          completionOtp: b.completion_otp,
+          payoutReleased: b.payout_released,
           createdAt: new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         }));
         
@@ -148,30 +160,45 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
   }, [userName]);
 
   const pendingRequests = requests.filter((r) => r.status === 'pending');
-  const acceptedBookings = requests.filter((r) => r.status === 'accepted');
+  const ongoingBookings = requests.filter((r) => r.status === 'ongoing' || r.status === 'accepted');
+  const completedBookings = requests.filter((r) => r.status === 'completed');
 
-  // Real client earnings calculation (strictly 0 for new companions until bookings are accepted)
-  const totalEarnings = acceptedBookings.reduce((sum, r) => sum + r.netPayout, 0);
-  const weeklyPayout = acceptedBookings.reduce((sum, r) => sum + r.netPayout, 0);
-  const completedHours = acceptedBookings.reduce((sum, r) => sum + r.hours, 0);
-  const partnerRating = acceptedBookings.length > 0 ? '5.0 ★' : 'New Partner';
+  // Real client earnings: released to companion account upon OTP verification
+  const totalEarnings = completedBookings.reduce((sum, r) => sum + r.netPayout, 0);
+  const heldInEscrow = ongoingBookings.reduce((sum, r) => sum + r.netPayout, 0);
+  const completedHours = completedBookings.reduce((sum, r) => sum + r.hours, 0);
+  const partnerRating = (completedBookings.length > 0 || ongoingBookings.length > 0) ? '5.0 ★' : 'New Partner';
 
   const handleAcceptRequest = async (id: string) => {
     setRequests((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: 'accepted' as const } : r))
+      prev.map((r) => (r.id === id ? { ...r, status: 'ongoing' as const } : r))
     );
     await updateBookingStatusInSupabase(id, 'confirmed');
 
-    const acceptedReq = requests.find(r => r.id === id);
+    const acceptedReq = requests.find((r) => r.id === id);
     if (acceptedReq) {
-      // Dispatch official confirmation email
+      const companionPhone = localStorage.getItem('ck_user_phone') || '+91 8789589633';
+      const seekerEmail = (acceptedReq as any).seekerEmail || localStorage.getItem('ck_user_email') || `${acceptedReq.seekerName.toLowerCase().replace(/\s+/g, '')}@gmail.com`;
+
+      // Dispatch official confirmation email to seeker containing companion details, direct phone & Completion OTP
       await sendBookingConfirmationEmail({
         booking_code: id.slice(0, 8),
         client_name: acceptedReq.seekerName,
+        client_email: seekerEmail,
+        companion_name: userName || 'Your Verified Companion',
+        companion_phone: companionPhone,
         service_title: acceptedReq.serviceTitle,
         city: acceptedReq.location,
         booking_date: acceptedReq.date,
         total_price: acceptedReq.totalEarnings,
+        completion_otp: acceptedReq.completionOtp || '4829',
+      });
+
+      setAcceptedEmailSent({
+        seekerName: acceptedReq.seekerName,
+        email: seekerEmail,
+        phone: companionPhone,
+        bookingCode: id.slice(0, 8),
       });
     }
 
@@ -180,6 +207,42 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
       spread: 60,
       origin: { y: 0.6 }
     });
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpModalBooking || !enteredOtp.trim()) return;
+    setIsVerifyingOtp(true);
+    setOtpError(null);
+
+    try {
+      const res = await verifyCompletionOtpAndReleasePayout(
+        (otpModalBooking as any).bookingCode || otpModalBooking.id,
+        enteredOtp.trim()
+      );
+
+      if (res.success) {
+        setRequests((prev) =>
+          prev.map((r) =>
+            r.id === otpModalBooking.id ? { ...r, status: 'completed' as const, payoutReleased: true } : r
+          )
+        );
+        const payout = res.payoutAmount || otpModalBooking.netPayout;
+        setOtpModalBooking(null);
+        setEnteredOtp('');
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.5 },
+        });
+        alert(`🎉 Outing Completed & Verified!\n\n₹${payout.toLocaleString('en-IN')} held in escrow has been successfully released to your account.`);
+      } else {
+        setOtpError(res.message);
+      }
+    } catch (err: any) {
+      setOtpError(err.message || 'OTP verification failed');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
   };
 
   const handleDeclineRequest = async (id: string) => {
@@ -200,17 +263,32 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
         
         {/* Top Header */}
         <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-5 sm:p-6 border border-pink-200 shadow-apple-md mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
             <button
               onClick={onBackToHome}
               aria-label="Back to landing page"
-              className="w-10 h-10 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-[#1d1d1f] transition apple-focus"
+              className="w-10 h-10 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-[#1d1d1f] transition apple-focus cursor-pointer shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
 
+            {/* Official Click Karo Date Karo Company Logo */}
+            <div 
+              onClick={onBackToHome}
+              className="flex items-center cursor-pointer select-none group/logo shrink-0"
+              title="Click Karo Date Karo"
+            >
+              <img 
+                src="/assets/brand_logo.png" 
+                alt="Click Karo Date Karo" 
+                className="h-10 sm:h-11 w-auto object-contain transition-transform duration-300 group-hover/logo:scale-105 drop-shadow-xs"
+              />
+            </div>
+
+            <div className="hidden sm:block h-7 w-px bg-pink-200 mx-1"></div>
+
             {/* Companion Primary Profile Photo with Camera Upload */}
-            <div className="relative group">
+            <div className="relative group shrink-0">
               <div className="w-13 h-13 rounded-full overflow-hidden ring-2 ring-emerald-300 shadow-sm bg-emerald-50">
                 <img 
                   src={companionPhotos[0]} 
@@ -344,14 +422,14 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
 
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 border border-pink-200 shadow-sm">
             <div className="flex items-center justify-between text-xs text-[#86868b] mb-2">
-              <span>Weekly Settlement</span>
-              <Calendar className="w-4 h-4 text-[#0071e3]" />
+              <span>Held in Platform Escrow</span>
+              <Lock className="w-4 h-4 text-amber-600" />
             </div>
-            <div className="text-2xl sm:text-3xl font-bold text-[#1d1d1f] font-display tabular-numbers">
-              ₹{weeklyPayout.toLocaleString('en-IN')}
+            <div className="text-2xl sm:text-3xl font-bold text-amber-700 font-display tabular-numbers">
+              ₹{heldInEscrow.toLocaleString('en-IN')}
             </div>
-            <div className="text-[10px] text-[#86868b] font-bold mt-1">
-              {weeklyPayout > 0 ? 'Auto-disbursed Tuesday' : 'Pending accepted bookings'}
+            <div className="text-[10px] text-amber-700 font-bold mt-1">
+              Releases upon Seeker OTP verification
             </div>
           </div>
 
@@ -472,7 +550,7 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
             </div>
 
             <div className="hidden sm:flex items-center gap-1.5 text-xs text-[#0071e3] font-bold bg-blue-50 px-3 py-1 rounded-full">
-              <ShieldCheck className="w-4 h-4" /> 100% Aadhaar Verified Seekers
+              <ShieldCheck className="w-4 h-4" /> 100% Face Verified Seekers
             </div>
           </div>
 
@@ -514,58 +592,32 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
                       </div>
                     </div>
 
-                    {/* CONNECT ACTIONS: VIEW PROFILE, DIRECT CALL, IN-APP CHAT */}
+                    {/* CONNECT ACTIONS: VIEW PROFILE, DECLINE, ACCEPT (Chat and call removed) */}
                     <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
                       <button
                         type="button"
                         onClick={() => setActiveProfileModal(req)}
-                        className="px-3 py-2 rounded-xl bg-pink-100/70 hover:bg-pink-100 text-[#1d1d1f] text-xs font-bold transition flex items-center gap-1"
+                        className="px-3 py-2 rounded-xl bg-pink-100/70 hover:bg-pink-100 text-[#1d1d1f] text-xs font-bold transition flex items-center gap-1 cursor-pointer"
                         title="View Seeker Verified Photos & Profile"
                       >
                         <UserCheck className="w-3.5 h-3.5 text-[#0071e3]" />
                         <span>Profile</span>
                       </button>
 
-                      {req.seekerPhone && req.seekerPhone !== 'Protected' && (
-                        <a
-                          href={`tel:${req.seekerPhone}`}
-                          className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition flex items-center gap-1"
-                          title="Call Seeker Directly"
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                          <span>Call</span>
-                        </a>
-                      )}
-
                       <button
                         type="button"
-                        onClick={() => {
-                          setChatTarget({
-                            name: req.seekerName,
-                            avatar: req.seekerAvatar,
-                            phone: req.seekerPhone,
-                            bookingCode: req.id.slice(0, 8),
-                          });
-                          setChatModalOpen(true);
-                        }}
-                        className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0071e3] border border-blue-200 text-xs font-bold transition flex items-center gap-1"
-                        title="Chat with Seeker"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>Chat</span>
-                      </button>
-
-                      <button
                         onClick={() => handleDeclineRequest(req.id)}
-                        className="p-2 rounded-xl border border-pink-200 hover:bg-rose-50 text-rose-600 transition"
+                        className="p-2 rounded-xl border border-pink-200 hover:bg-rose-50 text-rose-600 transition cursor-pointer"
                         title="Decline"
                       >
                         <XCircle className="w-4 h-4" />
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => handleAcceptRequest(req.id)}
-                        className="px-4 py-2 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white transition shadow-apple-sm text-xs font-bold flex items-center gap-1 active:scale-95"
+                        className="px-4 py-2 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white transition shadow-apple-sm text-xs font-bold flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                        title="Accept & Send Automatic Confirmation Email"
                       >
                         <CheckCircle2 className="w-4 h-4" />
                         <span>Accept</span>
@@ -591,52 +643,210 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
 
         </div>
 
-        {/* 3. CONFIRMED & UPCOMING SCHEDULE */}
-        {acceptedBookings.length > 0 && (
-          <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border border-pink-200 shadow-apple-md">
-            <h2 className="text-xl font-bold text-[#1d1d1f] mb-4">
-              Accepted &amp; Upcoming Bookings
-            </h2>
-            <div className="space-y-3">
-              {acceptedBookings.map((b) => (
-                <div key={b.id} className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <div>
+        {/* 3. ONGOING OUTINGS & ESCROW HELD */}
+        {ongoingBookings.length > 0 && (
+          <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border border-amber-200/80 shadow-apple-md mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-amber-100">
+              <div>
+                <h2 className="text-xl font-bold text-[#1d1d1f] flex items-center gap-2">
+                  <span>Ongoing Outings (Escrow Held)</span>
+                  <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
+                    {ongoingBookings.length} Active
+                  </span>
+                </h2>
+                <p className="text-xs text-[#86868b] mt-0.5">
+                  Meetups in progress. Ask the customer for the 4-digit OTP sent to their email to release your payout.
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-bold text-amber-800 block">Total In Escrow</span>
+                <span className="font-mono font-black text-lg text-amber-900">
+                  ₹{heldInEscrow.toLocaleString('en-IN')}.00
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {ongoingBookings.map((b) => (
+                <div
+                  key={b.id}
+                  className="p-5 rounded-2xl bg-amber-50/50 border border-amber-200/90 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs shadow-xs"
+                >
+                  <div className="space-y-1.5">
                     <div className="flex items-center gap-2 font-bold text-[#1d1d1f]">
-                      <span>{b.seekerName}</span>
-                      <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full text-[10px]">
-                        Confirmed
+                      <span className="text-sm">{b.seekerName}</span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-200">
+                        <Lock className="w-3 h-3 text-amber-700" />
+                        <span>Payment in Escrow</span>
                       </span>
                     </div>
-                    <div className="text-[#86868b] mt-1">
-                      {b.serviceTitle} &bull; {b.date} ({b.time}) &bull; {b.location}
+                    <div className="text-[#86868b]">
+                      {b.serviceTitle} &bull; {b.date} &bull; {b.location}
+                    </div>
+                    <div className="text-[11px] text-stone-600">
+                      Client Contact: <strong className="font-mono text-[#111827]">{b.seekerPhone}</strong>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-amber-200">
+                    <div className="text-right sm:text-right pr-2">
+                      <div className="text-[10px] text-[#86868b] uppercase font-bold">Your Net Payout</div>
+                      <div className="font-bold text-emerald-700 text-base">
+                        ₹{b.netPayout.toLocaleString('en-IN')}.00
+                      </div>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => {
-                        setChatTarget({
-                          name: b.seekerName,
-                          avatar: b.seekerAvatar,
-                          phone: b.seekerPhone,
-                          bookingCode: b.id.slice(0, 8),
-                        });
-                        setChatModalOpen(true);
+                        setOtpModalBooking(b);
+                        setEnteredOtp('');
+                        setOtpError(null);
                       }}
-                      className="px-3 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-bold flex items-center gap-1 shadow-xs hover:bg-emerald-50 transition"
+                      className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition shadow-sm text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                     >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      <span>Chat</span>
+                      <KeyRound className="w-4 h-4" />
+                      <span>Complete Meetup &amp; Enter OTP</span>
                     </button>
-                    <div className="text-right">
-                      <div className="font-bold text-emerald-700 text-base">
-                        ₹{b.netPayout.toLocaleString('en-IN')}
-                      </div>
-                      <div className="text-[10px] text-[#86868b]">Direct bank transfer</div>
-                    </div>
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* 4. COMPLETED OUTINGS & PAYOUTS RELEASED */}
+        {completedBookings.length > 0 && (
+          <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border border-emerald-200 shadow-apple-md mb-8">
+            <h2 className="text-xl font-bold text-[#1d1d1f] mb-4 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              <span>Completed Outings &amp; Payouts Released ({completedBookings.length})</span>
+            </h2>
+            <div className="space-y-3">
+              {completedBookings.map((b) => (
+                <div
+                  key={b.id}
+                  className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                >
+                  <div>
+                    <div className="flex items-center gap-2 font-bold text-[#1d1d1f]">
+                      <span>{b.seekerName}</span>
+                      <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                        Meetup Verified &amp; Paid
+                      </span>
+                    </div>
+                    <div className="text-[#86868b] mt-1">
+                      {b.serviceTitle} &bull; {b.date} &bull; {b.location}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-emerald-700 text-base">
+                      ₹{b.netPayout.toLocaleString('en-IN')}.00
+                    </div>
+                    <div className="text-[10px] text-emerald-600 font-bold">Payout Released to Bank/UPI</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* OTP VERIFICATION MODAL FOR MEETUP COMPLETION & ESCROW RELEASE */}
+        {otpModalBooking && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border border-stone-200 shadow-[0_25px_70px_rgba(0,0,0,0.18)] text-center space-y-4 relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setOtpModalBooking(null);
+                  setEnteredOtp('');
+                  setOtpError(null);
+                }}
+                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 transition cursor-pointer"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+
+              <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto shadow-md">
+                <KeyRound className="w-8 h-8" />
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="font-display font-black text-2xl text-[#111827]">
+                  Verify Outing Completion
+                </h3>
+                <p className="text-xs text-[#6B7280]">
+                  Enter the 4-digit OTP provided by <strong className="text-[#111827]">{otpModalBooking.seekerName}</strong> to release your held payout.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/90 text-left space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-stone-600">Client / Seeker:</span>
+                  <span className="font-bold text-[#111827]">{otpModalBooking.seekerName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-600">Service:</span>
+                  <span className="font-medium text-[#111827]">{otpModalBooking.serviceTitle}</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-amber-200/60">
+                  <span className="font-bold text-amber-900">Held Escrow Payout:</span>
+                  <span className="font-mono font-black text-sm text-emerald-700">
+                    ₹{otpModalBooking.netPayout.toLocaleString('en-IN')}.00
+                  </span>
+                </div>
+              </div>
+
+              {/* OTP Input */}
+              <div className="space-y-2 text-left">
+                <label className="text-xs font-bold text-[#111827] block">
+                  Customer Completion OTP
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={enteredOtp}
+                  onChange={(e) => {
+                    setEnteredOtp(e.target.value.replace(/\D/g, ''));
+                    setOtpError(null);
+                  }}
+                  placeholder="Enter 4-digit OTP (e.g. 4829)"
+                  className="w-full text-center tracking-widest font-mono text-xl py-3 px-4 rounded-2xl border-2 border-stone-200 focus:border-[#0071e3] outline-none transition font-bold"
+                  autoFocus
+                />
+                <p className="text-[11px] text-stone-500 text-center">
+                  Ask the customer for the code sent to their registered email.
+                </p>
+              </div>
+
+              {otpError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium text-left">
+                  {otpError}
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleVerifyOtp}
+                  disabled={enteredOtp.length < 4 || isVerifyingOtp}
+                  className="flex-1 py-3 rounded-2xl bg-[#0071e3] hover:bg-[#0077ed] disabled:opacity-50 text-white font-bold text-xs sm:text-sm transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{isVerifyingOtp ? 'Verifying...' : `Verify & Release ₹${otpModalBooking.netPayout.toLocaleString('en-IN')}`}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpModalBooking(null);
+                    setEnteredOtp('');
+                    setOtpError(null);
+                  }}
+                  className="px-4 py-3 rounded-2xl bg-stone-100 hover:bg-stone-200 text-[#111827] font-bold text-xs transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -654,30 +864,58 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
           isOpen={Boolean(activeProfileModal)}
           onClose={() => setActiveProfileModal(null)}
           booking={activeProfileModal}
-          onOpenChat={() => {
-            if (activeProfileModal) {
-              setChatTarget({
-                name: activeProfileModal.seekerName,
-                avatar: activeProfileModal.seekerAvatar,
-                phone: activeProfileModal.seekerPhone,
-                bookingCode: activeProfileModal.id.slice(0, 8),
-              });
-              setChatModalOpen(true);
-            }
-          }}
           onAccept={(id) => handleAcceptRequest(id)}
         />
 
-        {chatTarget && (
-          <ChatModal
-            isOpen={chatModalOpen}
-            onClose={() => setChatModalOpen(false)}
-            bookingCode={chatTarget.bookingCode}
-            otherPartyName={chatTarget.name}
-            otherPartyAvatar={chatTarget.avatar}
-            otherPartyPhone={chatTarget.phone}
-            currentRole="companion"
-          />
+        {/* AUTOMATIC CONFIRMATION EMAIL SENT POPUP */}
+        {acceptedEmailSent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border border-stone-200 shadow-[0_25px_70px_rgba(0,0,0,0.18)] text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-md">
+                <Mail className="w-9 h-9" />
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="font-display font-black text-2xl text-[#111827]">
+                  Booking Accepted!
+                </h3>
+                <p className="text-xs text-[#6B7280]">
+                  An automatic confirmation email has been dispatched to the seeker.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#FFF5F7] border border-pink-200 text-left space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-stone-500">Sent To (Seeker Email):</span>
+                  <span className="font-mono font-bold text-[#FF2D55]">{acceptedEmailSent.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-500">Booking Reference:</span>
+                  <span className="font-mono font-bold text-[#111827]">#{acceptedEmailSent.bookingCode}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-500">Companion Name:</span>
+                  <span className="font-bold text-[#111827]">{userName || 'Verified Companion'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-500">Number for Client to Call:</span>
+                  <span className="font-mono font-bold text-emerald-700">{acceptedEmailSent.phone}</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-stone-500">
+                The seeker has received your verified name and direct phone number to coordinate meeting details.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setAcceptedEmailSent(null)}
+                className="w-full py-3 rounded-2xl bg-[#111827] hover:bg-[#FF2D55] text-white font-bold text-xs sm:text-sm transition shadow-md cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
         )}
 
       </div>

@@ -195,7 +195,7 @@ export function validatePincode(pincode: string): PincodeValidationResult {
     isValidFormat: true,
     isLaunchCity: false,
     cityName: nonLaunchRegion,
-    message: `Currently NOT Live in ${nonLaunchRegion} (${cleaned}). We are currently operating exclusively in our 12 Launch Cities.`,
+    message: `Coverage expanding soon to ${nonLaunchRegion} (${cleaned}). Browse companions in our active cities below:`,
     suggestedCities: LAUNCH_CITIES.map(c => c.name),
   };
 }

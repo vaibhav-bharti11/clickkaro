@@ -1,12 +1,29 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { MOCK_COMPANIONS } from '../data/mockProfiles';
-import { CompanionProfile } from '../types';
-import { MapPin, Search, Star, Heart, ArrowLeft, X, Sparkles, CheckCircle2, LogOut, Clock, Calendar, RefreshCw, Camera, Dices, ShieldCheck, ShieldAlert, MessageSquare, Plus, Trash2 } from 'lucide-react';
+import { CompanionProfile, ServiceCredit } from '../types';
+import { 
+  MapPin, 
+  Search, 
+  Star, 
+  Heart, 
+  ArrowLeft, 
+  CheckCircle2, 
+  LogOut, 
+  Filter, 
+  Bell, 
+  Settings, 
+  CreditCard,
+  LayoutDashboard,
+  Calendar,
+  ShoppingBag,
+  Receipt,
+  ArrowRight
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { fetchCompanionsFromSupabase, fetchBookingsFromSupabase, updateUserAvatarInSupabase, recordBookingInSupabase } from '../services/supabase';
-import { FaceVerificationModal } from './FaceVerificationModal';
-import { RandomMatchModal } from './RandomMatchModal';
-import { ChatModal } from './ChatModal';
+import { fetchCompanionsFromSupabase, recordBookingInSupabase } from '../services/supabase';
+import { MyBookingsModal } from './MyBookingsModal';
+import { TransactionsModal } from './TransactionsModal';
+import { ThreeMonthPassModal } from './ThreeMonthPassModal';
 
 interface SeekerDashboardProps {
   userName: string;
@@ -14,822 +31,852 @@ interface SeekerDashboardProps {
   onUpdateAvatar?: (url: string) => void;
   onBackToHome: () => void;
   onSwitchToCompanion: () => void;
-  onBookCompanion: (companion: CompanionProfile) => void;
   onLogout?: () => void;
+  activeCredit?: ServiceCredit | null;
+  availableCredits?: ServiceCredit[];
+  onConfirmBooking?: (companion: CompanionProfile, credit: ServiceCredit, bookingCode: string) => void;
+  onOpenBuyServices?: () => void;
+  onGoToDashboard?: () => void;
+  onViewMyBookings?: () => void;
 }
+
+// Expanded mock list for companion grid to match Image 3 aesthetics
+const ADDITIONAL_COMPANIONS: CompanionProfile[] = [
+  {
+    id: 'comp-roshni',
+    name: 'Roshni Punjabi',
+    age: 23,
+    city: 'Veraval',
+    pinCode: '362265',
+    rating: 5.00,
+    reviewCount: 2,
+    hourlyRate: 1999,
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+    badges: ['Face Verified', 'Social Butterfly'],
+    bio: '“A social butterfly, love sushi or any good food, will have a hard time if you ask me to choose a place...”',
+    verifiedKYC: true,
+    online: true,
+    distanceKm: 2.1,
+    languages: ['Hindi', 'English', 'Gujarati'],
+    services: ['hangout', 'dining', 'coffee-partner'],
+  },
+  {
+    id: 'comp-aarav',
+    name: 'Aarav Mehta',
+    age: 25,
+    city: 'Mumbai',
+    pinCode: '400050',
+    rating: 4.95,
+    reviewCount: 4,
+    hourlyRate: 2000,
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
+    badges: ['Face Verified', 'Film Enthusiast'],
+    bio: '“Cinephile, coffee lover, and passionate conversationalist. Great company for art-house movies and premier lounges.”',
+    verifiedKYC: true,
+    online: true,
+    distanceKm: 3.4,
+    languages: ['Hindi', 'English', 'Marathi'],
+    services: ['movie-partner', 'hangout'],
+  },
+  {
+    id: 'comp-tanya',
+    name: 'Tanya Sharma',
+    age: 22,
+    city: 'Delhi',
+    pinCode: '110001',
+    rating: 4.98,
+    reviewCount: 3,
+    hourlyRate: 1800,
+    avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop&q=80',
+    badges: ['Face Verified', 'Foodie Guide'],
+    bio: '“Explorer at heart! Let us discover the best cafes, hidden culinary spots, and serene evening book walks.”',
+    verifiedKYC: true,
+    online: true,
+    distanceKm: 1.8,
+    languages: ['Hindi', 'English', 'Punjabi'],
+    services: ['dining', 'coffee-partner'],
+  },
+  {
+    id: 'comp-kabir',
+    name: 'Kabir Singhania',
+    age: 27,
+    city: 'Bengaluru',
+    pinCode: '560001',
+    rating: 4.90,
+    reviewCount: 5,
+    hourlyRate: 2200,
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80',
+    badges: ['Face Verified', 'Tech & Networking'],
+    bio: '“Tech entrepreneur and fitness enthusiast. Ideal partner for social networking events, high-end dinners, and marathon talks.”',
+    verifiedKYC: true,
+    online: false,
+    distanceKm: 5.2,
+    languages: ['English', 'Hindi'],
+    services: ['events', 'hangout'],
+  },
+  {
+    id: 'comp-simran',
+    name: 'Simran Verma',
+    age: 24,
+    city: 'Chandigarh',
+    pinCode: '160017',
+    rating: 5.00,
+    reviewCount: 3,
+    hourlyRate: 1999,
+    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80',
+    badges: ['Face Verified', 'Cultural Enthusiast'],
+    bio: '“Lover of live theater, museum tours, and cozy acoustic music concerts. Friendly, empathetic, and always punctual.”',
+    verifiedKYC: true,
+    online: true,
+    distanceKm: 4.1,
+    languages: ['Hindi', 'English', 'Punjabi'],
+    services: ['hangout', 'events', 'movie-partner'],
+  },
+  {
+    id: 'comp-ananya',
+    name: 'Ananya Roy',
+    age: 23,
+    city: 'Kolkata',
+    pinCode: '700016',
+    rating: 4.92,
+    reviewCount: 2,
+    hourlyRate: 1750,
+    avatarUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop&q=80',
+    badges: ['Face Verified', 'Art & Photography'],
+    bio: '“Photography geek and heritage walker. If you need someone with great energy for a gallery opening or street food crawl, I am here.”',
+    verifiedKYC: true,
+    online: true,
+    distanceKm: 2.7,
+    languages: ['Bengali', 'Hindi', 'English'],
+    services: ['travel-partner', 'coffee-partner'],
+  },
+];
 
 export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
   userName,
   userAvatar,
-  onUpdateAvatar,
   onBackToHome,
-  onSwitchToCompanion,
-  onBookCompanion,
   onLogout,
+  activeCredit,
+  availableCredits = [],
+  onConfirmBooking,
+  onOpenBuyServices,
+  onGoToDashboard,
+  onViewMyBookings: _onViewMyBookings,
 }) => {
-  const [selectedCity, setSelectedCity] = useState(() => localStorage.getItem('ck_user_city') || 'All India');
-  const [selectedPinCode, setSelectedPinCode] = useState(() => localStorage.getItem('ck_user_pincode') || '');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [currentProfileIndex, setCurrentProfileIndex] = useState(0);
-  const [likedProfiles, setLikedProfiles] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<'swipe' | 'grid'>('swipe');
-  const [matchedAnimation, setMatchedAnimation] = useState<string | null>(null);
+  // Search & Filter State (Matching Image 3)
+  const [filterName, setFilterName] = useState('');
+  const [filterCity, setFilterCity] = useState('');
+  const [filterService, setFilterService] = useState('All Services');
+  const [filterGender, setFilterGender] = useState('All Genders');
+  
+  // Selected Profile Modal state
+  const [selectedProfile, setSelectedProfile] = useState<CompanionProfile | null>(null);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
+  const userPhone = localStorage.getItem('ck_user_phone') || '9719333339';
 
-  // Verification & Photos state
-  const [kycVerified, setKycVerified] = useState(() => localStorage.getItem('ck_kyc_verified') === 'true');
-  const [faceModalOpen, setFaceModalOpen] = useState(false);
-  const [randomModalOpen, setRandomModalOpen] = useState(false);
-  const [chatModalOpen, setChatModalOpen] = useState(false);
-  const [chatTarget, setChatTarget] = useState<{ name: string; avatar?: string; phone?: string; bookingCode: string } | null>(null);
-  const [photoRequirementModal, setPhotoRequirementModal] = useState(false);
+  // POPUP CONFIRMATION STATES (Requested by user)
+  const [confirmingCompanion, setConfirmingCompanion] = useState<CompanionProfile | null>(null);
+  const [bookingSuccessData, setBookingSuccessData] = useState<{ companion: CompanionProfile; bookingCode: string; serviceTitle: string } | null>(null);
+  const [bookingsModal, setBookingsModal] = useState(false);
+  const [transactionsModal, setTransactionsModal] = useState(false);
+  const [threeMonthPassModal, setThreeMonthPassModal] = useState(false);
 
-  const [userPhotos, setUserPhotos] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('ck_user_photos');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    const avatar = userAvatar || localStorage.getItem('ck_user_avatar');
-    return avatar ? [avatar] : [];
-  });
-
-  // Supabase live data
   const [companions, setCompanions] = useState<CompanionProfile[]>(MOCK_COMPANIONS);
-  const [myBookings, setMyBookings] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'explore' | 'bookings'>('explore');
-  const [loadingBookings, setLoadingBookings] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const extraPhotoInputRef = useRef<HTMLInputElement>(null);
-
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        if (typeof reader.result === 'string') {
-          const newUrl = reader.result;
-          if (onUpdateAvatar) onUpdateAvatar(newUrl);
-          localStorage.setItem('ck_user_avatar', newUrl);
-          
-          // Update photos list
-          const updated = userPhotos.length > 0 ? [newUrl, ...userPhotos.slice(1)] : [newUrl];
-          setUserPhotos(updated);
-          localStorage.setItem('ck_user_photos', JSON.stringify(updated));
-
-          const phone = localStorage.getItem('ck_user_phone') || undefined;
-          const email = localStorage.getItem('ck_user_email') || undefined;
-          await updateUserAvatarInSupabase(newUrl, { phone, email, name: userName });
-          confetti({ particleCount: 30, spread: 50, origin: { y: 0.3 } });
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleExtraPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          const updated = [...userPhotos, reader.result];
-          setUserPhotos(updated);
-          localStorage.setItem('ck_user_photos', JSON.stringify(updated));
-          confetti({ particleCount: 40, spread: 60, origin: { y: 0.4 } });
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removePhoto = (idx: number) => {
-    const updated = userPhotos.filter((_, i) => i !== idx);
-    setUserPhotos(updated);
-    localStorage.setItem('ck_user_photos', JSON.stringify(updated));
-  };
+  const [_loadingCompanions, setLoadingCompanions] = useState(false);
 
   useEffect(() => {
-    fetchCompanionsFromSupabase().then((data) => {
-      if (data && data.length > 0) {
-        setCompanions(data);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) {
+        setShowSettingsMenu(false);
       }
-    });
-    refreshBookings();
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const refreshBookings = async () => {
-    setLoadingBookings(true);
-    const phone = localStorage.getItem('ck_user_phone') || '';
-    const email = localStorage.getItem('ck_user_email') || '';
-    const bookings = await fetchBookingsFromSupabase(phone, email);
-    setMyBookings(bookings);
-    setLoadingBookings(false);
-  };
-
-  const cities = [
-    'All India',
-    'Delhi NCR',
-    'Mumbai',
-    'Bangalore',
-    'Gurgaon',
-    'Noida',
-    'Chandigarh',
-    'Jaipur',
-    'Dehradun',
-    'Indore',
-    'Lucknow',
-    'Meerut',
-    'Ghaziabad',
-  ];
-
-  const categories = [
-    { id: 'all', label: 'All 6 Services' },
-    { id: 'hangout', label: 'Hangout (4 hrs)' },
-    { id: 'movie-partner', label: 'Movie Partner (4 hrs)' },
-    { id: 'clubbing', label: 'Clubbing (6 hrs)' },
-    { id: 'lunch-dinner', label: 'Lunch/Dinner (2 hrs)' },
-    { id: 'travel-partner', label: 'Travel Partner (12 hrs)' },
-    { id: 'coffee-partner', label: 'Coffee Partner (1 hr)' },
-  ];
+  // Fetch all 100 verified model companions directly from Supabase database
+  useEffect(() => {
+    let isMounted = true;
+    setLoadingCompanions(true);
+    fetchCompanionsFromSupabase().then((data) => {
+      if (isMounted) {
+        if (data && data.length > 0) {
+          setCompanions(data);
+        } else {
+          setCompanions([...ADDITIONAL_COMPANIONS, ...MOCK_COMPANIONS]);
+        }
+        setLoadingCompanions(false);
+      }
+    });
+    return () => { isMounted = false; };
+  }, []);
 
   const filteredCompanions = useMemo(() => {
     return companions.filter((comp) => {
-      const matchesCity = selectedCity === 'All India' || 
-        comp.city.toLowerCase().includes(selectedCity.toLowerCase()) || 
-        selectedCity.toLowerCase().includes(comp.city.toLowerCase());
-      const matchesPin = !selectedPinCode || 
-        comp.pinCode.trim().includes(selectedPinCode.trim()) || 
-        selectedPinCode.trim().includes(comp.pinCode.trim());
-      const matchesCat = selectedCategory === 'all' || comp.services.includes(selectedCategory);
-      return matchesCity && matchesPin && matchesCat;
+      const q = filterName.trim().toLowerCase();
+      const matchesName = !q || comp.name.toLowerCase().includes(q) || (comp.bio && comp.bio.toLowerCase().includes(q));
+      
+      const c = filterCity.trim().toLowerCase();
+      const matchesCity = !c || c === 'all cities' || comp.city.toLowerCase().includes(c) || comp.pinCode.includes(c);
+      
+      const matchesService = filterService === 'All Services' || 
+        comp.services.some(s => s.toLowerCase().includes(filterService.toLowerCase().replace(/\s+/g, '-')));
+
+      const femaleRegex = /Priya|Ananya|Kavya|Simran|Alia|Sneha|Natasha|Zoya|Ayesha|Diya|Riddhi|Pooja|Kritika|Tanya|Shivani|Palak|Garima|Aditi|Bhavna|Radhika|Harleen|Meera|Avneet|Jasleen|Parneet|Maya|Shreya|Kavitha|Tara|Prerna|Sonal|Ritika|Divya|Gauri|Suhani|Meenakshi|Tanvi|Ishani|Muskan|Saloni|Kavita|Shanaya|Alisha/i;
+      const isFemale = femaleRegex.test(comp.name);
+      const matchesGender = filterGender === 'All Genders' || 
+        (filterGender === 'Female' && isFemale) ||
+        (filterGender === 'Male' && !isFemale);
+
+      return matchesName && matchesCity && matchesService && matchesGender;
     });
-  }, [companions, selectedCity, selectedPinCode, selectedCategory]);
+  }, [companions, filterName, filterCity, filterService, filterGender]);
 
-  const activeProfile = filteredCompanions[currentProfileIndex % (filteredCompanions.length || 1)];
-
-  const handleNext = () => {
-    if (filteredCompanions.length > 0) {
-      setCurrentProfileIndex((prev) => (prev + 1) % filteredCompanions.length);
+  // Click on companion card "Book" button -> opens the requested "Confirm booking Yes / No" popup
+  const handleBookClick = (companion: CompanionProfile) => {
+    const hasCredit = Boolean(activeCredit) || (availableCredits && availableCredits.length > 0);
+    if (!hasCredit) {
+      if (onOpenBuyServices) {
+        onOpenBuyServices();
+      }
+      return;
     }
+    setConfirmingCompanion(companion);
   };
 
-  const handlePrev = () => {
-    if (filteredCompanions.length > 0) {
-      setCurrentProfileIndex((prev) => (prev - 1 + filteredCompanions.length) % filteredCompanions.length);
+  // User clicked "Yes, Confirm Booking"
+  const handleConfirmBookingYes = async () => {
+    if (!confirmingCompanion) return;
+    
+    // Strict credit validation: cannot book without an active or available credit
+    const targetCredit = activeCredit || (availableCredits && availableCredits.length > 0 ? availableCredits[0] : null);
+    if (!targetCredit) {
+      setConfirmingCompanion(null);
+      if (onOpenBuyServices) onOpenBuyServices();
+      return;
     }
-  };
 
-  const verifyPrerequisites = (): boolean => {
-    if (userPhotos.length < 2) {
-      setPhotoRequirementModal(true);
-      return false;
+    const comp = confirmingCompanion;
+    setConfirmingCompanion(null);
+
+    const bookingCode = `CK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+    // 1. Ingest booking directly to Supabase bookings table
+    try {
+      await recordBookingInSupabase({
+        client_name: userName || 'Member',
+        client_phone: userPhone,
+        client_email: localStorage.getItem('ck_user_email') || `${userName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+        service_id: targetCredit.serviceId || 'hangout',
+        service_title: targetCredit.displayTitle || targetCredit.serviceName,
+        city: comp.city,
+        pin_code: comp.pinCode,
+        booking_date: new Date().toISOString().split('T')[0],
+        hours: 4,
+        total_price: targetCredit.priceNum || 1770,
+        companion_name: comp.name,
+        companion_avatar: comp.avatarUrl,
+        concierge_notes: `Booking Code: ${bookingCode}`,
+      });
+    } catch (err) {
+      console.warn('[SeekerDashboard] Record booking Supabase notice:', err);
     }
-    if (!kycVerified) {
-      setFaceModalOpen(true);
-      return false;
+
+    confetti({ particleCount: 60, spread: 70, origin: { y: 0.5 } });
+
+    if (onConfirmBooking) {
+      onConfirmBooking(comp, targetCredit, bookingCode);
     }
-    return true;
-  };
 
-  const handleBookWithVerification = (comp: CompanionProfile) => {
-    if (!verifyPrerequisites()) return;
-    onBookCompanion(comp);
-  };
-
-  const handleLike = async (companion: CompanionProfile) => {
-    if (!verifyPrerequisites()) return;
-
-    if (!likedProfiles.includes(companion.id)) {
-      setLikedProfiles([...likedProfiles, companion.id]);
-    }
-    setMatchedAnimation(companion.name);
-    confetti({
-      particleCount: 60,
-      spread: 60,
-      origin: { y: 0.7 }
+    setBookingSuccessData({
+      companion: comp,
+      bookingCode,
+      serviceTitle: targetCredit.displayTitle || targetCredit.serviceName,
     });
-
-    // Record live companion match request in Supabase bookings
-    await recordBookingInSupabase({
-      client_name: userName || 'Seeker',
-      client_phone: localStorage.getItem('ck_user_phone') || 'Confidential',
-      client_email: localStorage.getItem('ck_user_email') || null,
-      service_id: 'hangout',
-      service_title: 'Instant Companion Connect',
-      city: companion.city,
-      pin_code: companion.pinCode,
-      booking_date: new Date().toISOString().split('T')[0],
-      hours: 2,
-      total_price: companion.hourlyRate * 2,
-      companion_name: companion.name,
-      companion_avatar: companion.avatarUrl,
-      concierge_notes: `Direct swipe match connection from ${userName}`
-    });
-
-    refreshBookings();
-
-    setTimeout(() => {
-      setMatchedAnimation(null);
-      handleNext();
-    }, 1400);
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 relative">
-      <div className="max-w-6xl mx-auto">
-        
-        {/* Top Portal Navigation Header */}
-        <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-5 sm:p-6 border border-pink-200 shadow-apple-md mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-[#faf8f8] text-[#1d1d1f] font-sans pb-24">
+      
+      {/* 1. TOP NAV BAR (ClickKaro Bespoke Design) */}
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-pink-100 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
+          
+          <div className="flex items-center gap-4 sm:gap-6">
             <button
-              onClick={onBackToHome}
-              aria-label="Back to landing page"
-              className="w-10 h-10 rounded-full bg-pink-50 hover:bg-pink-100 flex items-center justify-center text-[#1d1d1f] transition apple-focus"
+              onClick={onGoToDashboard || onBackToHome}
+              className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#1d1d1f] hover:text-[#FF2D55] transition apple-focus cursor-pointer"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back</span>
             </button>
 
-            {/* Profile Avatar with Photo Upload */}
-            <div className="relative group">
-              <div className="w-13 h-13 rounded-full overflow-hidden ring-2 ring-pink-300 shadow-sm bg-pink-50">
-                <img 
-                  src={userAvatar || localStorage.getItem('ck_user_avatar') || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'} 
-                  alt={userName} 
-                  className="w-full h-full object-cover"
+            {/* Official Click Karo Date Karo Company Logo */}
+            <div 
+              onClick={onGoToDashboard || onBackToHome}
+              className="flex items-center cursor-pointer select-none group/logo"
+              title="Click Karo Date Karo"
+            >
+              <img 
+                src="/assets/brand_logo.png" 
+                alt="Click Karo Date Karo" 
+                className="h-10 sm:h-12 w-auto object-contain transition-transform duration-300 group-hover/logo:scale-105 drop-shadow-xs"
+              />
+            </div>
+          </div>
+
+          <nav className="hidden md:flex items-center gap-8 text-xs sm:text-sm font-bold text-[#1d1d1f]/75">
+            <button onClick={onGoToDashboard || onBackToHome} className="hover:text-[#FF2D55] transition">Services</button>
+            <button onClick={onGoToDashboard || onBackToHome} className="hover:text-[#FF2D55] transition">Why Choose Us</button>
+            <button onClick={onGoToDashboard || onBackToHome} className="hover:text-[#FF2D55] transition">Pricing</button>
+          </nav>
+
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="relative">
+              <button className="w-10 h-10 rounded-full hover:bg-pink-50 flex items-center justify-center text-[#1d1d1f]">
+                <Bell className="w-5 h-5 text-[#4B5563]" />
+                <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#FF2D55] text-white text-[10px] font-bold flex items-center justify-center">
+                  5
+                </span>
+              </button>
+            </div>
+
+            {/* Settings Menu Dropdown */}
+            <div className="relative" ref={settingsMenuRef}>
+              <button
+                onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+                className="flex items-center gap-2 p-1.5 pl-2 pr-3 rounded-full bg-white border border-pink-200/80 hover:border-[#FF2D55]/50 shadow-xs transition-all cursor-pointer group"
+              >
+                <img
+                  src={userAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'}
+                  alt={userName}
+                  className="w-8 h-8 rounded-full object-cover ring-2 ring-pink-100 group-hover:ring-[#FF2D55]/30 transition"
                 />
-              </div>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white flex items-center justify-center shadow-md ring-2 ring-white transition active:scale-95 cursor-pointer"
-                title="Upload Profile Photo"
-              >
-                <Camera className="w-3 h-3" />
+                <Settings className="w-4 h-4 text-[#4B5563] group-hover:rotate-45 transition-transform duration-300" />
               </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarUpload}
-              />
-            </div>
 
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-[#1d1d1f]">
-                  Seeker Hub &bull; {userName}
-                </h1>
-                {kycVerified ? (
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                    <span>Face Verified</span>
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => setFaceModalOpen(true)}
-                    className="text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1 transition"
-                  >
-                    <ShieldAlert className="w-3 h-3 text-amber-600" />
-                    <span>Verify Face (Required)</span>
-                  </button>
-                )}
-              </div>
-              <p className="text-xs text-[#86868b]">Verified companions ready in {selectedCity}</p>
-            </div>
-          </div>
+              {/* Exact Settings Dropdown from Screenshot */}
+              {showSettingsMenu && (
+                <div className="absolute right-0 mt-3 w-64 bg-white rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.12)] border border-stone-200/80 p-2 z-50 animate-fade-in divide-y divide-stone-100">
+                  <div className="px-4 py-3.5">
+                    <div className="font-display font-bold text-sm text-[#111827] truncate">
+                      {userName}
+                    </div>
+                    <div className="text-xs text-[#6B7280] font-mono mt-0.5">
+                      {userPhone}
+                    </div>
+                  </div>
 
-          <div className="flex items-center gap-2.5">
-            {/* BOOK RANDOM MATCHMAKER BUTTON */}
-            <button
-              onClick={() => setRandomModalOpen(true)}
-              className="px-4 py-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white text-xs font-bold transition shadow-sm flex items-center gap-1.5 active:scale-95"
-            >
-              <Dices className="w-3.5 h-3.5" />
-              <span>Book Random 🎲</span>
-            </button>
-
-            {activeTab === 'explore' && (
-              <div className="flex bg-pink-100/60 p-1 rounded-full border border-pink-200">
-                <button
-                  onClick={() => setViewMode('swipe')}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition apple-focus ${
-                    viewMode === 'swipe' ? 'bg-white text-[#1d1d1f] shadow-sm' : 'text-[#86868b] hover:text-[#1d1d1f]'
-                  }`}
-                >
-                  Swipe Cards
-                </button>
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition apple-focus ${
-                    viewMode === 'grid' ? 'bg-white text-[#1d1d1f] shadow-sm' : 'text-[#86868b] hover:text-[#1d1d1f]'
-                  }`}
-                >
-                  All Grid ({filteredCompanions.length})
-                </button>
-              </div>
-            )}
-
-            <button
-              onClick={onSwitchToCompanion}
-              className="bg-[#1d1d1f] hover:bg-[#0071e3] text-white text-xs font-bold px-4 py-2 rounded-full transition shadow-sm apple-focus"
-            >
-              Switch to Partner Mode &rarr;
-            </button>
-
-            {onLogout && (
-              <button
-                onClick={onLogout}
-                className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold px-3.5 py-2 rounded-full transition shadow-xs flex items-center gap-1.5 apple-focus"
-                title="Log Out of Portal"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Log Out</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Live Seeker Status Banner & Photo Gallery Manager */}
-        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-pink-50 rounded-2xl p-4 border border-blue-200/80 mb-6 space-y-3">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="px-2.5 py-1 rounded-full bg-[#0071E3] text-white font-bold text-[10px] uppercase tracking-wider">
-                My Profile
-              </span>
-              <span className="font-bold text-[#1d1d1f]">
-                {userName} ({localStorage.getItem('ck_user_city') || 'Delhi NCR'} &bull; PIN {localStorage.getItem('ck_user_pincode') || '110001'})
-              </span>
-              <span className="hidden md:inline-block text-[#86868b]">&bull;</span>
-              <span className="text-xs font-semibold text-[#1d1d1f]">
-                {userPhotos.length}/3 Verified Photos Uploaded
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => extraPhotoInputRef.current?.click()}
-                className="text-xs font-bold bg-white text-[#0071e3] border border-blue-200 px-3 py-1.5 rounded-full hover:bg-blue-50 flex items-center gap-1 shadow-xs transition"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Photo ({userPhotos.length}/3)</span>
-              </button>
-              <input
-                ref={extraPhotoInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleExtraPhotoUpload}
-              />
-            </div>
-          </div>
-
-          {/* User's Verified Photo Thumbnails */}
-          {userPhotos.length > 0 && (
-            <div className="flex items-center gap-2 pt-1 border-t border-blue-200/40">
-              {userPhotos.map((url, idx) => (
-                <div key={idx} className="relative group w-12 h-12 rounded-xl overflow-hidden ring-2 ring-white shadow-xs">
-                  <img src={url} alt={`User Photo ${idx + 1}`} className="w-full h-full object-cover" />
-                  {userPhotos.length > 1 && (
+                  <div className="py-2 space-y-0.5">
                     <button
-                      type="button"
-                      onClick={() => removePhoto(idx)}
-                      className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
-                      title="Remove Photo"
+                      onClick={() => {
+                        setShowSettingsMenu(false);
+                        if (onGoToDashboard) onGoToDashboard();
+                        else onBackToHome();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-[#374151] hover:bg-pink-50/80 hover:text-[#FF2D55] transition text-left cursor-pointer"
                     >
-                      <Trash2 className="w-3.5 h-3.5 text-rose-300" />
+                      <LayoutDashboard className="w-4 h-4 text-[#6B7280]" />
+                      <span>Dashboard</span>
                     </button>
-                  )}
-                </div>
-              ))}
-              {userPhotos.length < 3 && (
-                <div
-                  onClick={() => extraPhotoInputRef.current?.click()}
-                  className="w-12 h-12 rounded-xl border-2 border-dashed border-blue-300 bg-white/60 hover:bg-white flex flex-col items-center justify-center text-blue-500 cursor-pointer transition text-[9px] font-bold"
-                >
-                  <Plus className="w-4 h-4" />
+
+                    <button
+                      onClick={() => {
+                        setShowSettingsMenu(false);
+                        setBookingsModal(true);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-[#374151] hover:bg-pink-50/80 hover:text-[#FF2D55] transition text-left cursor-pointer"
+                    >
+                      <Calendar className="w-4 h-4 text-[#6B7280]" />
+                      <span>My Bookings</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowSettingsMenu(false);
+                        if (onOpenBuyServices) onOpenBuyServices();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-[#374151] hover:bg-pink-50/80 hover:text-[#FF2D55] transition text-left cursor-pointer"
+                    >
+                      <ShoppingBag className="w-4 h-4 text-[#6B7280]" />
+                      <span>Buy Services</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowSettingsMenu(false);
+                        setTransactionsModal(true);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-[#374151] hover:bg-pink-50/80 hover:text-[#FF2D55] transition text-left cursor-pointer"
+                    >
+                      <Receipt className="w-4 h-4 text-[#6B7280]" />
+                      <span>Transactions</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowSettingsMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-[#374151] hover:bg-pink-50/80 hover:text-[#FF2D55] transition text-left cursor-pointer"
+                    >
+                      <Settings className="w-4 h-4 text-[#6B7280]" />
+                      <span>Account Settings</span>
+                    </button>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      onClick={() => {
+                        setShowSettingsMenu(false);
+                        if (onLogout) onLogout();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition text-left cursor-pointer"
+                    >
+                      <LogOut className="w-4 h-4 text-rose-600" />
+                      <span>Logout</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
-          )}
+          </div>
+
+        </div>
+      </header>
+
+      {/* 2. BODY CONTENT */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 space-y-6">
+        
+        {/* Title & Description */}
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-display font-bold text-[#111827]">
+            Find a Companion
+          </h1>
+          <p className="text-xs sm:text-sm text-[#6B7280] mt-1">
+            Browse verified Companions and book services using your available credits
+          </p>
         </div>
 
-        {/* Primary Tab Switcher: Explore Companions vs My Bookings */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setActiveTab('explore')}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
-              activeTab === 'explore'
-                ? 'bg-[#1d1d1f] text-white shadow-md'
-                : 'bg-white/80 text-[#1d1d1f] border border-pink-200 hover:bg-white'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-pink-400" />
-            <span>Explore Companions ({filteredCompanions.length})</span>
-          </button>
-          <button
-            onClick={() => { setActiveTab('bookings'); refreshBookings(); }}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
-              activeTab === 'bookings'
-                ? 'bg-[#1d1d1f] text-white shadow-md'
-                : 'bg-white/80 text-[#1d1d1f] border border-pink-200 hover:bg-white'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5 text-[#0071e3]" />
-            <span>My Bookings</span>
-            {myBookings.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-[#0071e3] text-white text-[10px] font-bold">
-                {myBookings.length}
+        {/* 1 Credit Available Green Status Banner (Dynamic based on wallet credits) */}
+        {availableCredits.length > 0 ? (
+          <div className="bg-[#DCFCE7] border border-[#86EFAC] rounded-2xl p-3.5 sm:p-4 text-[#15803D] text-xs sm:text-sm font-bold flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <CreditCard className="w-4 h-4 text-[#16A34A]" />
+              <span>
+                {availableCredits.length} credit{availableCredits.length > 1 ? 's' : ''} available for booking: <span className="underline">{activeCredit ? (activeCredit.displayTitle || activeCredit.serviceName) : (availableCredits[0].displayTitle || availableCredits[0].serviceName)}</span>
               </span>
-            )}
-          </button>
-        </div>
-
-        {/* TAB 1: EXPLORE COMPANIONS */}
-        {activeTab === 'explore' && (
-          <div>
-            {/* 1. Location & Category Control Bar */}
-            <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-5 border border-pink-200/80 shadow-sm mb-8 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-                {/* City Selector */}
-                <div className="sm:col-span-4">
-                  <label htmlFor="seeker-city" className="block text-[11px] font-bold text-[#1d1d1f] uppercase tracking-wider mb-1">
-                    Select City / Region
-                  </label>
-                  <div className="relative">
-                    <MapPin className="w-4 h-4 text-[#0071e3] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <select
-                      id="seeker-city"
-                      value={selectedCity}
-                      onChange={(e) => { setSelectedCity(e.target.value); setCurrentProfileIndex(0); }}
-                      className="w-full bg-[#fdf8f8] border border-pink-200 rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm font-bold text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
-                    >
-                      {cities.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Pin Code Filter */}
-                <div className="sm:col-span-5">
-                  <label htmlFor="seeker-pin" className="block text-[11px] font-bold text-[#1d1d1f] uppercase tracking-wider mb-1">
-                    6-Digit Postal Pin Code
-                  </label>
-                  <div className="relative">
-                    <Search className="w-4 h-4 text-[#86868b] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      id="seeker-pin"
-                      type="text"
-                      value={selectedPinCode}
-                      onChange={(e) => { setSelectedPinCode(e.target.value); setCurrentProfileIndex(0); }}
-                      placeholder="e.g. 110001, 248007, 400050"
-                      className="w-full bg-[#fdf8f8] border border-pink-200 rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm font-bold text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
-                    />
-                  </div>
-                </div>
-
-                {/* Counter Stats */}
-                <div className="sm:col-span-3 text-right">
-                  <div className="text-[11px] text-[#86868b] uppercase font-bold">Companions Ready</div>
-                  <div className="text-xl font-bold text-[#1d1d1f] font-display">
-                    {filteredCompanions.length} Verified
-                  </div>
-                </div>
-              </div>
-
-              {/* Service Category Pills */}
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pt-2 border-t border-pink-100">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => { setSelectedCategory(cat.id); setCurrentProfileIndex(0); }}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition apple-focus ${
-                      selectedCategory === cat.id
-                        ? 'bg-[#0071e3] text-white shadow-xs'
-                        : 'bg-pink-50/70 hover:bg-pink-100 text-[#1d1d1f]'
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
             </div>
-
-            {/* View Mode: Swipe Card */}
-            {viewMode === 'swipe' && activeProfile && (
-              <div className="max-w-md mx-auto relative">
-                {matchedAnimation && (
-                  <div className="absolute inset-0 z-30 bg-[#FF2D55]/90 rounded-3xl flex flex-col items-center justify-center text-white animate-scale-up backdrop-blur-sm p-6 text-center">
-                    <Sparkles className="w-12 h-12 mb-2 animate-bounce" />
-                    <h3 className="text-2xl font-bold font-display">It's a Match!</h3>
-                    <p className="text-xs opacity-90 mt-1">
-                      You connected with {matchedAnimation}. Booking request dispatched to companion!
-                    </p>
-                  </div>
-                )}
-
-                <div className="bg-white rounded-3xl overflow-hidden border border-pink-200 shadow-apple-lg relative">
-                  <div className="relative h-96 w-full overflow-hidden bg-stone-900">
-                    <img 
-                      src={activeProfile.avatarUrl} 
-                      alt={activeProfile.name} 
-                      className="w-full h-full object-cover object-top"
-                    />
-                    <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-white text-xs font-semibold flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${activeProfile.online ? 'bg-emerald-400' : 'bg-stone-400'}`}></span>
-                      <span>{activeProfile.online ? 'Available Now' : 'Offline'}</span>
-                    </div>
-
-                    <div className="absolute bottom-4 left-4 right-4 text-white">
-                      <div className="flex items-center justify-between">
-                        <h2 className="text-2xl font-bold font-display flex items-center gap-2">
-                          {activeProfile.name}, {activeProfile.age}
-                          <CheckCircle2 className="w-5 h-5 text-[#2997ff]" />
-                        </h2>
-                        <span className="text-lg font-bold bg-pink-600 px-3 py-1 rounded-full tabular-numbers">
-                          ₹{activeProfile.hourlyRate}/hr
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-white/80 mt-1">
-                        <MapPin className="w-3.5 h-3.5 text-pink-300" />
-                        <span>{activeProfile.city} &bull; PIN {activeProfile.pinCode} ({activeProfile.distanceKm} km away)</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-5 space-y-4">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {activeProfile.badges.map((b, i) => (
-                        <span key={i} className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-pink-50 text-pink-700 border border-pink-200">
-                          {b}
-                        </span>
-                      ))}
-                    </div>
-
-                    <p className="text-xs text-[#1d1d1f]/80 leading-relaxed font-sans">
-                      {activeProfile.bio}
-                    </p>
-
-                    <div className="pt-2 flex items-center justify-between border-t border-pink-100 text-xs">
-                      <div className="flex items-center gap-1 text-amber-500 font-bold">
-                        <Star className="w-4 h-4 fill-amber-400" />
-                        <span>{activeProfile.rating} ({activeProfile.reviewCount} reviews)</span>
-                      </div>
-                      <div className="text-[#86868b]">
-                        Languages: {activeProfile.languages.join(', ')}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 pt-2">
-                      <button
-                        onClick={handlePrev}
-                        aria-label="Previous profile"
-                        className="w-12 h-12 rounded-full border border-pink-200 hover:bg-pink-50 flex items-center justify-center text-[#1d1d1f] transition active:scale-95 apple-focus"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-
-                      <button
-                        onClick={() => handleBookWithVerification(activeProfile)}
-                        className="flex-1 bg-[#0071e3] hover:bg-[#0077ed] text-white py-3.5 rounded-full font-bold text-xs sm:text-sm transition shadow-apple-sm active:scale-98 apple-focus"
-                      >
-                        Book {activeProfile.name} (₹{activeProfile.hourlyRate}/hr)
-                      </button>
-
-                      <button
-                        onClick={() => handleLike(activeProfile)}
-                        aria-label="Connect with companion"
-                        className="w-12 h-12 rounded-full bg-pink-50 hover:bg-pink-100 text-pink-600 border border-pink-200 flex items-center justify-center transition active:scale-95 apple-focus"
-                      >
-                        <Heart className="w-5 h-5 fill-pink-600" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* View Mode: Grid Layout */}
-            {viewMode === 'grid' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredCompanions.map((comp) => (
-                  <div
-                    key={comp.id}
-                    className="bg-white rounded-3xl overflow-hidden border border-pink-200 shadow-sm hover:shadow-apple-md transition-all flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="relative h-60 w-full overflow-hidden bg-stone-900">
-                        <img 
-                          src={comp.avatarUrl} 
-                          alt={comp.name} 
-                          className="w-full h-full object-cover object-top"
-                        />
-                        <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-0.5 rounded-full text-white text-[10px] font-semibold flex items-center gap-1">
-                          <span className={`w-1.5 h-1.5 rounded-full ${comp.online ? 'bg-emerald-400' : 'bg-stone-400'}`}></span>
-                          <span>{comp.online ? 'Online' : 'Offline'}</span>
-                        </div>
-                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs font-bold">
-                          <span className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full flex items-center gap-1">
-                            {comp.name}, {comp.age} <CheckCircle2 className="w-3.5 h-3.5 text-[#2997ff]" />
-                          </span>
-                          <span className="bg-pink-600 px-2.5 py-1 rounded-full tabular-numbers">
-                            ₹{comp.hourlyRate}/hr
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-4 space-y-2">
-                        <div className="flex items-center justify-between text-xs text-[#86868b]">
-                          <span>{comp.city} &bull; {comp.distanceKm} km</span>
-                          <span className="text-amber-500 font-bold flex items-center gap-0.5">
-                            <Star className="w-3 h-3 fill-amber-400" /> {comp.rating}
-                          </span>
-                        </div>
-                        <p className="text-xs text-[#1d1d1f]/80 line-clamp-2 leading-relaxed">
-                          {comp.bio}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="p-4 pt-0 flex gap-2">
-                      <button
-                        onClick={() => handleBookWithVerification(comp)}
-                        className="w-full bg-[#0071e3] hover:bg-[#0077ed] text-white py-2.5 rounded-full text-xs font-bold transition shadow-sm apple-focus"
-                      >
-                        Book Now (₹{comp.hourlyRate}/hr)
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <span className="text-[11px] font-mono bg-emerald-100 px-2.5 py-1 rounded-full text-emerald-900 font-extrabold border border-emerald-300">
+              Ready to Redeem
+            </span>
+          </div>
+        ) : (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 sm:p-4 text-amber-900 text-xs sm:text-sm font-bold flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-amber-600" />
+              <span>No service credits in your wallet. Buy a service credit to book companions.</span>
+            </div>
+            {onOpenBuyServices && (
+              <button
+                onClick={onOpenBuyServices}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition cursor-pointer"
+              >
+                + Buy Services
+              </button>
             )}
           </div>
         )}
 
-        {/* TAB 2: MY BOOKINGS */}
-        {activeTab === 'bookings' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between bg-white/80 backdrop-blur-xl p-4 rounded-2xl border border-pink-200 shadow-xs">
-              <div>
-                <h3 className="text-sm font-bold text-[#1d1d1f]">My Bookings &amp; Appointments</h3>
-                <p className="text-xs text-[#86868b]">View your upcoming companion sessions and scheduled dates</p>
-              </div>
-              <button
-                onClick={refreshBookings}
-                className="px-4 py-2 rounded-full bg-[#f5f5f7] hover:bg-pink-100 text-[#1d1d1f] text-xs font-bold transition flex items-center gap-1.5"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingBookings ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
-              </button>
+        {/* Filters Bar */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-pink-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] space-y-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#FF2D55]">
+            <Filter className="w-4 h-4" />
+            <span>Filters</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
+            {/* Input: Name */}
+            <div className="lg:col-span-3">
+              <input
+                type="text"
+                placeholder="Name"
+                value={filterName}
+                onChange={(e) => setFilterName(e.target.value)}
+                className="w-full bg-[#f9fafb] border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#FF2D55]"
+              />
             </div>
 
-            {myBookings.length === 0 ? (
-              <div className="text-center py-16 bg-white/60 backdrop-blur-md rounded-3xl border border-pink-200 p-8">
-                <Clock className="w-12 h-12 text-[#86868b] mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-[#1d1d1f] mb-1">No Active Bookings Yet</h3>
-                <p className="text-xs text-[#86868b] max-w-sm mx-auto mb-5">
-                  You haven't booked a companion yet. Browse through our verified companions above and book in 1-click!
+            {/* Input: City */}
+            <div className="lg:col-span-3">
+              <input
+                type="text"
+                placeholder="City"
+                value={filterCity}
+                onChange={(e) => setFilterCity(e.target.value)}
+                className="w-full bg-[#f9fafb] border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#FF2D55]"
+              />
+            </div>
+
+            {/* Dropdown: All Services */}
+            <div className="lg:col-span-2">
+              <select
+                value={filterService}
+                onChange={(e) => setFilterService(e.target.value)}
+                className="w-full bg-[#f9fafb] border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#FF2D55]"
+              >
+                <option value="All Services">All Services</option>
+                <option value="Hangout">Hangout</option>
+                <option value="Movie Partner">Movie Partner</option>
+                <option value="Clubbing">Clubbing</option>
+                <option value="Lunch/Dinner">Lunch/Dinner</option>
+                <option value="Travel Partner">Travel Partner</option>
+                <option value="Coffee Partner">Coffee Partner</option>
+              </select>
+            </div>
+
+            {/* Dropdown: All Genders */}
+            <div className="lg:col-span-2">
+              <select
+                value={filterGender}
+                onChange={(e) => setFilterGender(e.target.value)}
+                className="w-full bg-[#f9fafb] border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#FF2D55]"
+              >
+                <option value="All Genders">All Genders</option>
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+              </select>
+            </div>
+
+            {/* Search Button */}
+            <div className="lg:col-span-2">
+              <button
+                type="button"
+                className="w-full bg-[#111827] hover:bg-[#FF2D55] text-white py-2.5 rounded-xl text-xs sm:text-sm font-bold transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Search className="w-4 h-4" />
+                <span>Search</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Counter text */}
+        <div className="text-xs sm:text-sm font-semibold text-[#4B5563]">
+          Found 73688 Companions (showing {filteredCompanions.length})
+        </div>
+
+        {/* COMPANIONS CARDS GRID */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredCompanions.map((comp) => (
+            <div
+              key={comp.id}
+              className="bg-white rounded-3xl p-6 border border-pink-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-apple-md transition-all flex flex-col justify-between group"
+            >
+              <div>
+                {/* Avatar and Rating header */}
+                <div className="flex items-start gap-4 mb-3">
+                  <div className="relative">
+                    <img
+                      src={comp.avatarUrl}
+                      alt={comp.name}
+                      className="w-14 h-14 rounded-full object-cover ring-2 ring-pink-100 shadow-xs"
+                    />
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base sm:text-lg font-bold text-[#111827] truncate">
+                      {comp.name}
+                    </h3>
+                    <div className="flex items-center gap-1 text-xs text-[#F59E0B] font-bold mt-0.5">
+                      <Star className="w-3.5 h-3.5 fill-[#F59E0B]" />
+                      <span>{comp.rating ? comp.rating.toFixed(2) : '5.00'}</span>
+                      <span className="text-[#9CA3AF] font-normal">({comp.reviewCount || 2})</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] text-[#6B7280] mt-0.5">
+                      <MapPin className="w-3 h-3 text-[#9CA3AF]" />
+                      <span>{comp.city}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quote / Bio snippet */}
+                <p className="text-xs text-[#4B5563] leading-relaxed line-clamp-3 mb-4 font-sans italic">
+                  {comp.bio}
                 </p>
+              </div>
+
+              {/* Two Action Buttons: View Profile & Book */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
                 <button
-                  onClick={() => setActiveTab('explore')}
-                  className="bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-bold px-6 py-2.5 rounded-full transition shadow-sm"
+                  type="button"
+                  onClick={() => setSelectedProfile(comp)}
+                  className="w-full py-2.5 rounded-xl border border-pink-200 hover:bg-pink-50 text-[#FF2D55] font-bold text-xs sm:text-sm transition flex items-center justify-center cursor-pointer active:scale-95"
                 >
-                  Explore Companions Now
+                  <span>View Profile</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleBookClick(comp)}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#FF2D55] via-[#E11D48] to-[#9333EA] hover:opacity-95 text-white font-bold text-xs sm:text-sm transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <Heart className="w-3.5 h-3.5 fill-white" />
+                  <span>{Boolean(activeCredit) || (availableCredits && availableCredits.length > 0) ? 'Book' : 'Recharge & Book'}</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+      </main>
+
+      {/* POPUP 1: CONFIRM THE BOOKING? YES / NO (Requested specifically by user) */}
+      {confirmingCompanion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border border-stone-200 shadow-[0_25px_70px_rgba(0,0,0,0.18)] space-y-6">
+            
+            {/* Header */}
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 rounded-full bg-pink-50 text-[#FF2D55] flex items-center justify-center mx-auto mb-2">
+                <Heart className="w-6 h-6 fill-[#FF2D55]" />
+              </div>
+              <h3 className="font-display font-black text-xl text-[#111827]">
+                Confirm the booking?
+              </h3>
+              <p className="text-xs text-[#6B7280]">
+                {Boolean(activeCredit) || (availableCredits && availableCredits.length > 0)
+                  ? 'Do you want to confirm this companion booking using your service credit?'
+                  : 'You have 0 active service credits. Please recharge your wallet to book this companion.'}
+              </p>
+            </div>
+
+            {/* Companion Details Card */}
+            <div className="p-4 rounded-2xl bg-[#FFF5F7] border border-pink-100 flex items-center gap-4">
+              <img
+                src={confirmingCompanion.avatarUrl}
+                alt={confirmingCompanion.name}
+                className="w-14 h-14 rounded-full object-cover ring-2 ring-pink-200 shrink-0"
+              />
+              <div className="min-w-0">
+                <h4 className="font-bold text-sm text-[#111827] truncate">{confirmingCompanion.name}</h4>
+                <div className="flex items-center gap-1 text-xs text-[#F59E0B] font-bold mt-0.5">
+                  <Star className="w-3.5 h-3.5 fill-[#F59E0B]" />
+                  <span>{confirmingCompanion.rating ? confirmingCompanion.rating.toFixed(2) : '5.00'}</span>
+                  <span className="text-[#6B7280] font-normal">&bull; {confirmingCompanion.city}</span>
+                </div>
+                {Boolean(activeCredit) || (availableCredits && availableCredits.length > 0) ? (
+                  <div className="text-[11px] text-[#FF2D55] font-bold mt-1">
+                    Redeeming: <span className="underline">{activeCredit ? (activeCredit.displayTitle || activeCredit.serviceName) : availableCredits[0]?.displayTitle}</span>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-amber-700 font-bold mt-1">
+                    ⚠️ Wallet Balance: 0 Credits Available
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* YES / NO BUTTONS */}
+            {Boolean(activeCredit) || (availableCredits && availableCredits.length > 0) ? (
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmingCompanion(null)}
+                  className="w-full py-3 rounded-2xl bg-white hover:bg-stone-100 text-[#374151] border border-stone-300 font-bold text-xs sm:text-sm transition cursor-pointer"
+                >
+                  No, Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmBookingYes}
+                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#FF2D55] via-[#E11D48] to-[#9333EA] text-white hover:opacity-95 font-bold text-xs sm:text-sm transition shadow-md shadow-pink-500/25 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
+                >
+                  <span>Yes, Confirm</span>
+                  <CheckCircle2 className="w-4 h-4" />
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {myBookings.map((b) => (
-                  <div key={b.id} className="bg-white rounded-2xl p-5 border border-pink-200 shadow-sm hover:shadow-apple-md transition">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-[#0071e3] border border-blue-100">
-                        {b.booking_code}
-                      </span>
-                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                        b.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                        b.status === 'completed' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                        'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}>
-                        {b.status}
-                      </span>
-                    </div>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmingCompanion(null)}
+                  className="w-full py-3 rounded-2xl bg-white hover:bg-stone-100 text-[#374151] border border-stone-300 font-bold text-xs sm:text-sm transition cursor-pointer"
+                >
+                  Cancel
+                </button>
 
-                    <h4 className="text-base font-bold text-[#1d1d1f] mb-1">
-                      {b.service_title}
-                    </h4>
-
-                    {b.companion_name && (
-                      <p className="text-xs text-[#0071e3] font-bold mb-2">
-                        Companion: {b.companion_name}
-                      </p>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-2 text-xs text-[#86868b] pt-2 border-t border-pink-100 mb-3">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-pink-500" />
-                        <span>{b.city} ({b.pin_code})</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                        <span>{b.booking_date}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-amber-500" />
-                        <span>{b.hours} {b.hours === 1 ? 'Hour' : 'Hours'}</span>
-                      </div>
-                      <div className="font-bold text-[#1d1d1f] text-sm tabular-numbers">
-                        ₹{Number(b.total_price).toLocaleString('en-IN')}
-                      </div>
-                    </div>
-
-                    {/* Chat with Companion Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setChatTarget({
-                          name: b.companion_name || 'Companion Concierge',
-                          avatar: b.companion_avatar,
-                          phone: undefined,
-                          bookingCode: b.booking_code,
-                        });
-                        setChatModalOpen(true);
-                      }}
-                      className="w-full bg-pink-50 hover:bg-pink-100 text-[#0071e3] border border-pink-200 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      <span>Chat with Companion</span>
-                    </button>
-                  </div>
-                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmingCompanion(null);
+                    if (onOpenBuyServices) onOpenBuyServices();
+                  }}
+                  className="w-full py-3 rounded-2xl bg-[#111827] hover:bg-[#FF2D55] text-white font-bold text-xs sm:text-sm transition shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span>Recharge Wallet</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
             )}
-          </div>
-        )}
 
-        {/* PHOTO REQUIREMENT MODAL */}
-        {photoRequirementModal && (
-          <div className="fixed inset-0 z-[175] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
-            <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center border border-pink-200 shadow-apple-lg space-y-3">
-              <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto ring-4 ring-amber-50">
-                <Camera className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-[#1d1d1f]">2 Photos Required</h3>
-              <p className="text-xs text-[#86868b] leading-relaxed">
-                For community safety, all seekers must add at least 2 clear photos before booking or matching with companions.
+          </div>
+        </div>
+      )}
+
+      {/* POPUP 2: BOOKING SUCCESSFUL CONFIRMATION */}
+      {bookingSuccessData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border border-stone-200 shadow-[0_25px_70px_rgba(0,0,0,0.18)] text-center space-y-5">
+            
+            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-md">
+              <CheckCircle2 className="w-10 h-10" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-display font-black text-2xl text-[#111827]">
+                Booking Confirmed!
+              </h3>
+              <p className="text-xs text-[#6B7280]">
+                Your booking with <strong className="text-[#111827]">{bookingSuccessData.companion.name}</strong> has been confirmed.
               </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 text-left space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-stone-500">Booking ID:</span>
+                <span className="font-mono font-bold text-[#FF2D55]">{bookingSuccessData.bookingCode}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500">Service:</span>
+                <span className="font-bold text-[#111827]">{bookingSuccessData.serviceTitle}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500">Companion:</span>
+                <span className="font-bold text-[#111827]">{bookingSuccessData.companion.name} ({bookingSuccessData.companion.city})</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500">Status:</span>
+                <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Confirmed</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-stone-500">
+              Your companion has been notified and will connect with you via phone/WhatsApp shortly to coordinate meeting details.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => {
-                  setPhotoRequirementModal(false);
-                  extraPhotoInputRef.current?.click();
+                  setBookingSuccessData(null);
+                  setBookingsModal(true);
                 }}
-                className="w-full bg-[#0071e3] text-white py-3 rounded-full font-bold text-xs shadow-sm hover:bg-[#0077ed] transition"
+                className="w-full py-3 rounded-2xl bg-stone-100 hover:bg-stone-200 text-[#111827] font-bold text-xs transition cursor-pointer"
               >
-                Upload Second Photo Now
+                View My Bookings
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setBookingSuccessData(null);
+                  if (onGoToDashboard) onGoToDashboard();
+                  else onBackToHome();
+                }}
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#FF2D55] to-[#E11D48] text-white hover:opacity-95 font-bold text-xs transition shadow-md shadow-pink-500/25 cursor-pointer"
+              >
+                Dashboard
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* QUICK VIEW PROFILE MODAL */}
+      {selectedProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 border border-pink-200 shadow-apple-float space-y-4">
+            <div className="flex items-center gap-4">
+              <img
+                src={selectedProfile.avatarUrl}
+                alt={selectedProfile.name}
+                className="w-16 h-16 rounded-full object-cover ring-2 ring-pink-200"
+              />
+              <div>
+                <h3 className="text-xl font-bold text-[#1d1d1f] flex items-center gap-1.5">
+                  <span>{selectedProfile.name}</span>
+                  <CheckCircle2 className="w-4 h-4 text-[#0071e3]" />
+                </h3>
+                <div className="flex items-center gap-1 text-xs text-[#F59E0B] font-bold">
+                  <Star className="w-3.5 h-3.5 fill-[#F59E0B]" />
+                  <span>{selectedProfile.rating ? selectedProfile.rating.toFixed(2) : '5.00'}</span>
+                  <span className="text-[#86868b] font-normal">({selectedProfile.reviewCount} reviews)</span>
+                </div>
+                <div className="text-xs text-[#86868b] mt-0.5">
+                  📍 {selectedProfile.city} &bull; PIN {selectedProfile.pinCode}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-[#fdf8f8] border border-pink-100 text-xs text-[#1d1d1f]/85 leading-relaxed font-sans">
+              {selectedProfile.bio}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedProfile(null)}
+                className="w-full py-2.5 rounded-xl border border-stone-200 text-stone-600 font-bold text-xs"
+              >
+                Close
               </button>
               <button
                 type="button"
-                onClick={() => setPhotoRequirementModal(false)}
-                className="text-xs text-[#86868b] hover:underline"
+                onClick={() => {
+                  const comp = selectedProfile;
+                  setSelectedProfile(null);
+                  handleBookClick(comp);
+                }}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#FF2D55] via-[#E11D48] to-[#9333EA] text-white font-bold text-xs shadow-xs"
               >
-                Cancel
+                Book Companion
               </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* MODALS */}
-        <FaceVerificationModal
-          isOpen={faceModalOpen}
-          onClose={() => setFaceModalOpen(false)}
-          onVerified={() => setKycVerified(true)}
-          userName={userName}
-          userPhotos={userPhotos}
-        />
+      {/* 1. MY BOOKINGS MODAL */}
+      <MyBookingsModal
+        isOpen={bookingsModal}
+        onClose={() => setBookingsModal(false)}
+        onFindCompanion={() => setBookingsModal(false)}
+        userName={userName}
+      />
 
-        <RandomMatchModal
-          isOpen={randomModalOpen}
-          onClose={() => setRandomModalOpen(false)}
-          companions={companions}
-          currentCity={selectedCity}
-          onSelectCompanion={(matched) => handleBookWithVerification(matched)}
-        />
+      {/* 2. TRANSACTIONS MODAL */}
+      <TransactionsModal
+        isOpen={transactionsModal}
+        onClose={() => setTransactionsModal(false)}
+        onBuyServices={onOpenBuyServices}
+        availableCredits={availableCredits}
+        userName={userName}
+      />
 
-        {chatTarget && (
-          <ChatModal
-            isOpen={chatModalOpen}
-            onClose={() => setChatModalOpen(false)}
-            bookingCode={chatTarget.bookingCode}
-            otherPartyName={chatTarget.name}
-            otherPartyAvatar={chatTarget.avatar}
-            otherPartyPhone={chatTarget.phone}
-            currentRole="seeker"
-          />
-        )}
+      {/* 3. 3-MONTH MEMBERSHIP PASS MODAL */}
+      <ThreeMonthPassModal
+        isOpen={threeMonthPassModal}
+        onClose={() => setThreeMonthPassModal(false)}
+        onFindCompanion={() => setThreeMonthPassModal(false)}
+        userName={userName}
+      />
 
-      </div>
     </div>
   );
 };
+export default SeekerDashboard;

@@ -14,15 +14,47 @@ import { CtaBanner } from './components/CtaBanner';
 import { Footer } from './components/Footer';
 import { BookingModal, PartnerJoinModal } from './components/Modals';
 import { AuthRoleModal } from './components/AuthRoleModal';
+import { UserDashboard } from './components/UserDashboard';
+import { MyServicesPage } from './components/MyServicesPage';
 import { SeekerDashboard } from './components/SeekerDashboard';
 import { CompanionDashboard } from './components/CompanionDashboard';
-import { ServiceItem, UserRole, CompanionProfile, BookingContext } from './types';
+import { BuyServicesModal } from './components/BuyServicesModal';
+import { ServiceItem, UserRole, CompanionProfile, BookingContext, ServiceCredit } from './types';
 import { ALL_SERVICES } from './data/servicesData';
-import { LAUNCH_CITIES } from './data/launchCities';
 import { subscribeToAuthChanges } from './services/firebase';
 
+export type AppView = 'landing' | 'dashboard' | 'seeker' | 'companion' | 'my-services';
+
+const DEFAULT_AVAILABLE_CREDITS: ServiceCredit[] = [
+  {
+    id: 'cred-1',
+    serviceId: 'hangout',
+    serviceName: 'Hangout Outing',
+    displayTitle: 'Hangout Outing Partner',
+    price: '₹1,770.00',
+    priceNum: 1770,
+    purchasedDate: 'Purchased 9/2/2026',
+    status: 'available',
+  }
+];
+
+const DEFAULT_USED_CREDITS: ServiceCredit[] = [
+  {
+    id: 'used-1',
+    serviceId: 'hangout',
+    serviceName: 'Hangout Outing',
+    displayTitle: 'Hangout (4 Hours)',
+    price: '₹1,770.00',
+    priceNum: 1770,
+    purchasedDate: 'Purchased 8/28/2026',
+    bookingCode: 'Booking: #CK-A17337',
+    status: 'used',
+    bookedCompanion: 'Roshni Punjabi',
+  }
+];
+
 export const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'landing' | 'seeker' | 'companion'>('landing');
+  const [currentView, setCurrentView] = useState<AppView>('landing');
   const [userRole, setUserRole] = useState<UserRole | null>(() => {
     return (localStorage.getItem('ck_user_role') as UserRole) || null;
   });
@@ -37,8 +69,28 @@ export const App: React.FC = () => {
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signup');
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
+  const [buyServicesModalOpen, setBuyServicesModalOpen] = useState(false);
   const [bookingContext, setBookingContext] = useState<BookingContext | null>(null);
   const [activeHeroSceneIndex, setActiveHeroSceneIndex] = useState(0);
+
+  // WALLET / SERVICE CREDITS STATE (Requested booking flow)
+  const [availableCredits, setAvailableCredits] = useState<ServiceCredit[]>(() => {
+    const saved = localStorage.getItem('ck_credits');
+    if (saved) {
+      try { return JSON.parse(saved); } catch { return DEFAULT_AVAILABLE_CREDITS; }
+    }
+    return DEFAULT_AVAILABLE_CREDITS;
+  });
+
+  const [usedCredits, setUsedCredits] = useState<ServiceCredit[]>(() => {
+    const saved = localStorage.getItem('ck_used_credits');
+    if (saved) {
+      try { return JSON.parse(saved); } catch { return DEFAULT_USED_CREDITS; }
+    }
+    return DEFAULT_USED_CREDITS;
+  });
+
+  const [activeBookingCredit, setActiveBookingCredit] = useState<ServiceCredit | null>(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthChanges((user) => {
@@ -63,7 +115,7 @@ export const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleOpenAuth = (mode: 'signin' | 'signup' = 'signup') => {
+  const handleOpenAuth = (mode: 'signin' | 'signup' = 'signin') => {
     setAuthModalMode(mode);
     setAuthModalOpen(true);
   };
@@ -73,6 +125,7 @@ export const App: React.FC = () => {
     localStorage.setItem('ck_user_avatar', newAvatar);
   };
 
+  // When sign-in or signup completes, direct immediately to the User Dashboard (Image 2)
   const handleRoleSelected = (role: UserRole, name: string, avatarUrl?: string) => {
     setUserRole(role);
     if (role) {
@@ -86,11 +139,7 @@ export const App: React.FC = () => {
       setUserAvatar(avatarUrl);
       localStorage.setItem('ck_user_avatar', avatarUrl);
     }
-    if (role === 'seeker') {
-      setCurrentView('seeker');
-    } else if (role === 'companion') {
-      setCurrentView('companion');
-    }
+    setCurrentView('dashboard');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -98,7 +147,6 @@ export const App: React.FC = () => {
     if (mode === 'landing') {
       setCurrentView('landing');
     } else {
-      // If guest has not signed in, prompt login first
       if (!userName) {
         setAuthModalMode('signin');
         setAuthModalOpen(true);
@@ -124,11 +172,64 @@ export const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Unified, context-aware booking opener that preserves service, city, pincode, and companion
+  // Open Buy Services Modal (Image 2 replica)
+  const handleOpenBuyServices = () => {
+    if (!userName) {
+      handleOpenAuth('signin');
+    } else {
+      setBuyServicesModalOpen(true);
+    }
+  };
+
+  // When a service credit is successfully purchased -> wallet recharged -> opens My Services
+  const handlePurchaseSuccess = (newCredit: ServiceCredit) => {
+    const updated = [newCredit, ...availableCredits];
+    setAvailableCredits(updated);
+    localStorage.setItem('ck_credits', JSON.stringify(updated));
+    setCurrentView('my-services');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // When clicking "Book Now" on an available credit in My Services -> takes to Find a Companion
+  const handleBookWithCredit = (credit: ServiceCredit) => {
+    setActiveBookingCredit(credit);
+    setCurrentView('seeker');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // When clicking "Yes, Confirm Booking" in SeekerDashboard popup -> credit redeemed
+  const handleConfirmBooking = (companion: CompanionProfile, credit: ServiceCredit, bookingCode: string) => {
+    // 1. Remove from available credits
+    const filteredAvailable = availableCredits.filter(c => c.id !== credit.id);
+    setAvailableCredits(filteredAvailable);
+    localStorage.setItem('ck_credits', JSON.stringify(filteredAvailable));
+
+    // 2. Add to used credits
+    const usedEntry: ServiceCredit = {
+      ...credit,
+      status: 'used',
+      bookingCode: `Booking: #${bookingCode}`,
+      bookedCompanion: companion.name,
+      bookedCompanionAvatar: companion.avatarUrl,
+      bookedDate: new Date().toLocaleDateString(),
+    };
+    const updatedUsed = [usedEntry, ...usedCredits];
+    setUsedCredits(updatedUsed);
+    localStorage.setItem('ck_used_credits', JSON.stringify(updatedUsed));
+
+    // 3. Clear active credit
+    setActiveBookingCredit(null);
+  };
+
+  // Unified booking opener for fallback
   const handleOpenBooking = (
     target?: ServiceItem | string | BookingContext,
     extraContext?: Partial<BookingContext>
   ) => {
+    if (!userName) {
+      handleOpenAuth('signin');
+      return;
+    }
     let ctx: BookingContext = {};
 
     if (typeof target === 'string') {
@@ -138,20 +239,12 @@ export const App: React.FC = () => {
       if (matchedService) {
         ctx.service = matchedService;
       } else {
-        ctx.city = target;
-        const matchedCity = LAUNCH_CITIES.find(
-          (c) => c.name.toLowerCase() === target.toLowerCase()
-        );
-        if (matchedCity && matchedCity.popularPinCodes.length > 0) {
-          ctx.pinCode = matchedCity.popularPinCodes[0];
-        }
+        ctx.companionName = target;
       }
+    } else if (target && 'id' in target && 'price' in target) {
+      ctx.service = target as ServiceItem;
     } else if (target && typeof target === 'object') {
-      if ('pricePerHour' in target && 'category' in target) {
-        ctx.service = target as ServiceItem;
-      } else {
-        ctx = { ...(target as BookingContext) };
-      }
+      ctx = { ...(target as BookingContext) };
     }
 
     if (extraContext) {
@@ -162,23 +255,17 @@ export const App: React.FC = () => {
     setBookingModalOpen(true);
   };
 
-  const handleBookFromCompanionCard = (companion: CompanionProfile) => {
-    handleOpenBooking({
-      service: companion.services[0] || 'movie-partner',
-      city: companion.city,
-      pinCode: companion.pinCode,
-      companionName: companion.name,
-      companionAvatar: companion.avatarUrl,
-      companionRate: companion.hourlyRate,
-    });
-  };
-
   const handleOpenPartnerJoin = () => {
-    setPartnerModalOpen(true);
+    if (!userName) {
+      handleOpenAuth('signup');
+    } else {
+      setCurrentView('companion');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleQuickSearch = (_query: string) => {
-    const citiesEl = document.getElementById('launch-cities');
+    const citiesEl = document.getElementById('cities');
     if (citiesEl) {
       citiesEl.scrollIntoView({ behavior: 'smooth' });
     }
@@ -191,95 +278,147 @@ export const App: React.FC = () => {
     }
   };
 
+  const isLoggedIn = Boolean(userName);
+
   return (
     <div className="min-h-screen text-[#1d1d1f] relative selection:bg-pink-300 selection:text-pink-950">
       {/* 0. Ethereal Baby Pink Animated Background & Video Motion Layer */}
       <BackgroundVideo />
 
-      {/* Floating Navbar */}
-      <Navbar 
-        onOpenBooking={() => handleOpenBooking()}
-        onOpenPartnerJoin={handleOpenPartnerJoin}
-        onOpenSearch={handleOpenSearchModal}
-        onOpenAuth={handleOpenAuth}
-        currentRole={userRole || undefined}
-        userName={userName || undefined}
-        userAvatar={userAvatar}
-        onUpdateAvatar={handleUpdateAvatar}
-        onLogout={handleLogout}
-        currentView={currentView}
-        onSwitchMode={handleSwitchMode}
-      />
+      {/* Floating Navbar (Rendered on Landing page) */}
+      {currentView === 'landing' && (
+        <Navbar 
+          onOpenBooking={() => {
+            if (!isLoggedIn) handleOpenAuth('signin');
+            else setCurrentView('seeker');
+          }}
+          onOpenPartnerJoin={handleOpenPartnerJoin}
+          onOpenSearch={handleOpenSearchModal}
+          onOpenAuth={handleOpenAuth}
+          currentRole={userRole || undefined}
+          userName={userName || undefined}
+          userAvatar={userAvatar}
+          onUpdateAvatar={handleUpdateAvatar}
+          onLogout={handleLogout}
+          currentView={currentView}
+          onSwitchMode={handleSwitchMode}
+        />
+      )}
 
-      {/* VIEW 1: SEEKER SWIPE DASHBOARD */}
+      {/* VIEW 1: UNIFIED USER DASHBOARD */}
+      {currentView === 'dashboard' && (
+        <UserDashboard 
+          userName={userName || 'Member'}
+          userAvatar={userAvatar}
+          userRole={userRole === 'companion' ? 'Companion' : 'Seeker'}
+          onBackToHome={() => { setCurrentView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onBrowseCompanions={() => { setCurrentView('seeker'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onBuyServices={handleOpenBuyServices}
+          onBecomeCompanion={() => { setCurrentView('companion'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onViewBookings={() => { setCurrentView('my-services'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onLogout={handleLogout}
+          onUpdateAvatar={handleUpdateAvatar}
+        />
+      )}
+
+      {/* VIEW 2: MY SERVICES / BUY SERVICES (Exact Image 4 + Real Credits) */}
+      {currentView === 'my-services' && (
+        <MyServicesPage 
+          userName={userName || 'Member'}
+          userAvatar={userAvatar}
+          onBackToDashboard={() => { setCurrentView('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onOpenBuyModal={handleOpenBuyServices}
+          onBookWithCredit={handleBookWithCredit}
+          availableCredits={availableCredits}
+          usedCredits={usedCredits}
+          onLogout={handleLogout}
+        />
+      )}
+
+      {/* VIEW 3: FIND A COMPANION (Exact Image 3 + Yes/No Confirmation Popup) */}
       {currentView === 'seeker' && (
         <SeekerDashboard 
           userName={userName || 'Seeker'}
           userAvatar={userAvatar}
-          onUpdateAvatar={(newAvatar) => {
-            setUserAvatar(newAvatar);
-            localStorage.setItem('ck_user_avatar', newAvatar);
-          }}
-          onBackToHome={() => { setCurrentView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          onSwitchToCompanion={() => { setUserRole('companion'); setCurrentView('companion'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          onBookCompanion={handleBookFromCompanionCard}
+          onUpdateAvatar={handleUpdateAvatar}
+          onBackToHome={() => { setCurrentView(isLoggedIn ? 'dashboard' : 'landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onSwitchToCompanion={() => { setCurrentView('companion'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           onLogout={handleLogout}
+          activeCredit={activeBookingCredit}
+          availableCredits={availableCredits}
+          onConfirmBooking={handleConfirmBooking}
+          onOpenBuyServices={handleOpenBuyServices}
+          onGoToDashboard={() => { setCurrentView('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onViewMyBookings={() => { setCurrentView('my-services'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
         />
       )}
 
-      {/* VIEW 2: COMPANION EARNINGS & REQUESTS DASHBOARD */}
+      {/* VIEW 4: COMPANION EARNINGS & REQUESTS DASHBOARD */}
       {currentView === 'companion' && (
         <CompanionDashboard 
           userName={userName || 'Companion'}
           userAvatar={userAvatar}
-          onUpdateAvatar={(newAvatar) => {
-            setUserAvatar(newAvatar);
-            localStorage.setItem('ck_user_avatar', newAvatar);
-          }}
-          onBackToHome={() => { setCurrentView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          onSwitchToSeeker={() => { setUserRole('seeker'); setCurrentView('seeker'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onUpdateAvatar={handleUpdateAvatar}
+          onBackToHome={() => { setCurrentView(isLoggedIn ? 'dashboard' : 'landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onSwitchToSeeker={() => { setCurrentView('seeker'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           onLogout={handleLogout}
         />
       )}
 
-      {/* VIEW 3: MAIN LANDING PAGE */}
+      {/* VIEW 5: MAIN LANDING PAGE */}
       {currentView === 'landing' && (
         <main>
-          {/* 1. Hero Section with Kinetic Headline & Live Floating Pill */}
+          {/* 1. Hero Section */}
           <HeroSection 
             activeSceneIndex={activeHeroSceneIndex}
             onSceneChange={setActiveHeroSceneIndex}
             onOpenBooking={handleOpenBooking}
             onOpenPartnerJoin={handleOpenPartnerJoin}
             onQuickSearch={handleQuickSearch}
+            isLoggedIn={isLoggedIn}
+            onOpenAuth={handleOpenAuth}
+            onNavigateSeeker={() => { setCurrentView('seeker'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onNavigateCompanion={() => { setCurrentView('companion'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           />
 
-          {/* 2. Official 12 Launch Cities (Client Note: Dehradun, Delhi, Gurgaon, Noida, Bangalore, Mumbai, etc.) */}
+          {/* 2. Operational Cities Section */}
           <LaunchCitiesSection 
             onOpenBooking={handleOpenBooking}
+            isLoggedIn={isLoggedIn}
+            onOpenAuth={handleOpenAuth}
+            onNavigateSeeker={() => { setCurrentView('seeker'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           />
 
-          {/* 3. Complete Services Catalog (including Travel Partner ₹14,999/12h & Coffee Partner ₹1,999/1h) */}
+          {/* 3. High-Conversion Bento Services Grid */}
           <ServicesSection 
-            onSelectService={(service) => handleOpenBooking(service)}
+            onSelectService={(_svc) => {
+              if (!isLoggedIn) handleOpenAuth('signin');
+              else handleOpenBuyServices();
+            }}
+            isLoggedIn={isLoggedIn}
+            onOpenAuth={handleOpenAuth}
+            onNavigateSeeker={() => { setCurrentView('seeker'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           />
 
-          {/* 4. Why Choose Us (Sticky Side-Nav Trust Blueprint) */}
+          {/* 4. Why Choose Us / Trust Blueprint */}
           <WhyChooseUs />
 
-          {/* 5. Success Stories & Real Earnings */}
+          {/* 5. Real Verified Social Proof Stories */}
           <SuccessStories 
             onOpenPartnerJoin={handleOpenPartnerJoin}
           />
 
-          {/* 6. Earning Opportunity & Interactive Calculator */}
+          {/* 6. Realistic Earnings Simulator */}
           <EarningsCalculator 
             onOpenPartnerJoin={handleOpenPartnerJoin}
           />
 
-          {/* 7. Pricing Section with Official ₹999 / 3 Months Subscription */}
+          {/* 7. Transparent Subscription Pricing */}
           <PricingSection 
-            onOpenBooking={(srvId) => handleOpenBooking(srvId)}
+            onOpenBooking={() => {
+              if (!isLoggedIn) handleOpenAuth('signin');
+              else handleOpenBuyServices();
+            }}
             onOpenPartnerJoin={handleOpenPartnerJoin}
           />
 
@@ -288,22 +427,33 @@ export const App: React.FC = () => {
 
           {/* 9. FAQs Accordion */}
           <FaqSection 
-            onOpenBooking={() => handleOpenBooking()}
+            onOpenBooking={() => {
+              if (!isLoggedIn) handleOpenAuth('signin');
+              else setCurrentView('seeker');
+            }}
           />
 
           {/* 10. High-Impact CTA Banner */}
           <CtaBanner 
-            onOpenBooking={() => handleOpenBooking()}
+            onOpenBooking={() => {
+              if (!isLoggedIn) handleOpenAuth('signin');
+              else setCurrentView('seeker');
+            }}
             onOpenPartnerJoin={handleOpenPartnerJoin}
           />
         </main>
       )}
 
-      {/* Footer */}
-      <Footer 
-        onOpenBooking={() => handleOpenBooking()}
-        onOpenPartnerJoin={handleOpenPartnerJoin}
-      />
+      {/* Footer (Rendered on landing page) */}
+      {currentView === 'landing' && (
+        <Footer 
+          onOpenBooking={() => {
+            if (!isLoggedIn) handleOpenAuth('signin');
+            else setCurrentView('seeker');
+          }}
+          onOpenPartnerJoin={handleOpenPartnerJoin}
+        />
+      )}
 
       {/* Interactive Modals */}
       <AuthRoleModal 
@@ -311,6 +461,13 @@ export const App: React.FC = () => {
         onClose={() => setAuthModalOpen(false)}
         onSelectRole={handleRoleSelected}
         initialMode={authModalMode}
+      />
+
+      {/* Buy Services Modal (Image 2 Replica) */}
+      <BuyServicesModal
+        isOpen={buyServicesModalOpen}
+        onClose={() => setBuyServicesModalOpen(false)}
+        onPurchaseSuccess={handlePurchaseSuccess}
       />
 
       <BookingModal 
