@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import { ServiceCredit, ServiceItem } from '../types';
 import { ALL_SERVICES } from '../data/servicesData';
 import { recordPaymentInSupabase } from '../services/supabase';
+import { useCms } from '../context/CmsContext';
 
 interface BuyServicesModalProps {
   isOpen: boolean;
@@ -16,11 +17,16 @@ export const BuyServicesModal: React.FC<BuyServicesModalProps> = ({
   onClose,
   onPurchaseSuccess,
 }) => {
+  const { content } = useCms();
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   if (!isOpen) return null;
+
+  const availableServices: ServiceItem[] = (content.services?.services && content.services.services.length > 0)
+    ? (content.services.services as any)
+    : ALL_SERVICES;
 
   const handlePay = () => {
     if (!selectedService) return;
@@ -111,7 +117,7 @@ export const BuyServicesModal: React.FC<BuyServicesModalProps> = ({
                 <span className="text-emerald-700 font-semibold">100% Refundable</span>
               </div>
 
-              {ALL_SERVICES.map((svc) => {
+              {availableServices.map((svc) => {
                 const isSelected = selectedService?.id === svc.id;
                 return (
                   <div

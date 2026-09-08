@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Calendar, MapPin, Clock, Users, Sparkles, ArrowRight, CheckCircle2, Search, Ticket } from 'lucide-react';
+import { useCms } from '../context/CmsContext';
 
 export interface EventItem {
   id: string;
@@ -128,20 +129,40 @@ export const UpcomingEventsModal: React.FC<UpcomingEventsModalProps> = ({
   onClose,
   onBookEventPartner,
 }) => {
+  const { content } = useCms();
   const [selectedCity, setSelectedCity] = useState<string>('All Cities');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   if (!isOpen) return null;
 
-  const filteredEvents = UPCOMING_EVENTS.filter((evt) => {
-    const matchesCity = selectedCity === 'All Cities' || evt.city.toLowerCase() === selectedCity.toLowerCase();
+  const rawEvents: EventItem[] = (content.upcomingEvents?.events && content.upcomingEvents.events.length > 0)
+    ? content.upcomingEvents.events.map((e) => ({
+        id: e.id,
+        title: e.title,
+        category: (e.category || 'Social Mixer') as any,
+        date: e.date,
+        time: e.time || '04:00 PM – 08:00 PM',
+        city: e.city,
+        venue: e.venue,
+        image: e.imageUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
+        priceFormatted: `₹${e.price}/session`,
+        priceNum: e.price,
+        attendeesCount: e.attendeesCount || 20,
+        maxCapacity: e.maxSlots || 30,
+        description: e.description,
+        tags: [e.badge || 'Curated', e.city],
+      }))
+    : UPCOMING_EVENTS;
+
+  const filteredEvents = rawEvents.filter((evt) => {
+    const matchesCity = selectedCity === 'All Cities' || evt.city.toLowerCase().includes(selectedCity.toLowerCase()) || selectedCity.toLowerCase().includes(evt.city.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || evt.category === selectedCategory;
     const matchesSearch = !searchQuery.trim() || 
       evt.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
       evt.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       evt.venue.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCity && matchesCategory && matchesSearch;
+    return matchesCategory && matchesSearch && (selectedCity === 'All Cities' || matchesCity);
   });
 
   return (

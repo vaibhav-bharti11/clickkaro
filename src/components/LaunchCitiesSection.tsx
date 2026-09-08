@@ -13,12 +13,18 @@ interface LaunchCitiesSectionProps {
   onNavigateSeeker?: () => void;
 }
 
+import { useCms } from '../context/CmsContext';
+
 export const LaunchCitiesSection: React.FC<LaunchCitiesSectionProps> = ({ 
   onOpenBooking,
   isLoggedIn = false,
   onOpenAuth,
   onNavigateSeeker,
 }) => {
+  const { content } = useCms();
+  const citiesCms = content.launchCities;
+  const citiesList = citiesCms.cities && citiesCms.cities.length > 0 ? citiesCms.cities : LAUNCH_CITIES;
+
   const [selectedCityId, setSelectedCityId] = useState<string>('delhi');
   const [searchPin, setSearchPin] = useState('');
   const [validationResult, setValidationResult] = useState<PincodeValidationResult | null>(null);
@@ -26,7 +32,7 @@ export const LaunchCitiesSection: React.FC<LaunchCitiesSectionProps> = ({
   const [hasSearched, setHasSearched] = useState(false);
   const [isSearchingDb, setIsSearchingDb] = useState(false);
 
-  const activeCity = LAUNCH_CITIES.find(c => c.id === selectedCityId) || LAUNCH_CITIES[0];
+  const activeCity = citiesList.find(c => c.id === selectedCityId) || citiesList[0] || LAUNCH_CITIES[0];
 
   const handlePinVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,7 +155,7 @@ export const LaunchCitiesSection: React.FC<LaunchCitiesSectionProps> = ({
                 </span>
                 <span className="text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{activeCity.activeCompanions}+ Active Companions Online</span>
+                  <span>{activeCity.activeCompanions || (activeCity as any).companionsCount || 24}+ Active Companions Online</span>
                 </span>
               </div>
 
@@ -162,7 +168,7 @@ export const LaunchCitiesSection: React.FC<LaunchCitiesSectionProps> = ({
                   Popular Meetup Hubs in {activeCity.name}:
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {activeCity.featuredSpots.map((spot, idx) => (
+                  {(activeCity.featuredSpots || ['Central Hub', 'Cultural Centres', 'Premier Cafes']).map((spot: string, idx: number) => (
                     <span key={idx} className="text-xs font-semibold bg-[#f5f5f7] text-[#1d1d1f] px-3 py-1.5 rounded-xl border border-black/5">
                       📍 {spot}
                     </span>
@@ -202,7 +208,7 @@ export const LaunchCitiesSection: React.FC<LaunchCitiesSectionProps> = ({
                     maxLength={6}
                     value={searchPin}
                     onChange={(e) => setSearchPin(e.target.value.replace(/\D/g, ''))}
-                    placeholder={`e.g. ${activeCity.popularPinCodes[0] || '110001'}`}
+                    placeholder={`e.g. ${activeCity.popularPinCodes?.[0] || '110001'}`}
                     className="w-full bg-white border border-pink-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#FF2D55]"
                   />
                 </div>

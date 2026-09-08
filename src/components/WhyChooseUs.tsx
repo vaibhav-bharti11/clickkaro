@@ -1,50 +1,54 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Phone } from 'lucide-react';
+import { useCms } from '../context/CmsContext';
 
 export const WhyChooseUs: React.FC = () => {
+  const { content } = useCms();
+  const whyCms = content.whyChoose;
+
   const [activeStep, setActiveStep] = useState(0);
 
   const steps = [
     {
       num: '01.',
-      title: '100% AI Face Verification',
-      subtitle: 'Every companion undergoes secure live AI Face Verification and identity verification before ever appearing on our network.',
-      pillText: 'Face Verified',
+      title: whyCms.features[0]?.title || '100% AI Face Verification',
+      subtitle: whyCms.features[0]?.description || 'Every companion undergoes secure live AI Face Verification and identity verification before ever appearing on our network.',
+      pillText: whyCms.features[0]?.tag || 'Face Verified',
       chatSender: 'Priya Sharma (Verified)',
       chatText: '“Hi! My face verification is completed. Looking forward to our movie meetup!”',
     },
     {
       num: '02.',
-      title: 'Strict Consent-First & Safety Code',
-      subtitle: 'Zero tolerance for harassment or boundary crossing. Real-time in-app SOS safety tracking and continuous location monitoring for total peace of mind.',
-      pillText: 'Safe & Respectful',
+      title: whyCms.features[1]?.title || 'Strict Consent-First & Safety Code',
+      subtitle: whyCms.features[1]?.description || 'Zero tolerance for harassment or boundary crossing. Real-time in-app SOS safety tracking and continuous location monitoring for total peace of mind.',
+      pillText: whyCms.features[1]?.tag || 'Safe & Respectful',
       chatSender: 'Safety Concierge (24/7)',
       chatText: '“SOS emergency protocol & GPS tracking active for your session in Connaught Place.”',
     },
     {
       num: '03.',
-      title: 'Direct Verified Companion Connect',
-      subtitle: 'Whether you are in Delhi, Mumbai, Bengaluru, or other popular cities, discover vetted companions near your location easily and securely.',
-      pillText: 'Direct Connect',
+      title: whyCms.features[2]?.title || 'Direct Verified Companion Connect',
+      subtitle: whyCms.features[2]?.description || 'Whether you are in Delhi, Mumbai, Bengaluru, or other popular cities, discover vetted companions near your location easily and securely.',
+      pillText: whyCms.features[2]?.tag || 'Direct Connect',
       chatSender: 'Companion Concierge',
       chatText: '“Found verified companions available in your location ready for instant connection.”',
     },
   ];
 
   return (
-    <section id="trust-blueprint" className="py-24 px-4 sm:px-6 border-b border-pink-200/50 relative z-10">
+    <section id="trust-blueprint" className="py-24 px-4 sm:px-6 border-b border-pink-200/50 relative z-10 font-sans">
       <div className="max-w-6xl mx-auto">
         
         {/* Master Heading */}
         <div className="w-full max-w-2xl mx-auto text-center mb-16">
           <span className="text-xs font-semibold text-[#0071e3] uppercase tracking-wider mb-2 block">
-            The Trust Standard
+            {whyCms.sectionBadge || 'The Trust Standard'}
           </span>
           <h2 className="text-3xl sm:text-5xl font-semibold tracking-tight text-[#1d1d1f] mb-3 headline-balance">
-            A Social Support Network Built on Real Trust.
+            {whyCms.sectionTitle || 'A Social Support Network Built on Real Trust.'}
           </h2>
           <p className="text-base text-[#1d1d1f]/75 body-pretty">
-            Safe, background-checked companions with transparent protocols and 24/7 assistance.
+            {whyCms.sectionSubtitle || 'Safe, background-checked companions with transparent protocols and 24/7 assistance.'}
           </p>
         </div>
 

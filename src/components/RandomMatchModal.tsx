@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CompanionProfile } from '../types';
 import { X, Star, MapPin, CheckCircle2, ArrowRight, Dices, SlidersHorizontal, RefreshCw } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useCms } from '../context/CmsContext';
 
 interface RandomMatchModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export const RandomMatchModal: React.FC<RandomMatchModalProps> = ({
   currentCity,
   onSelectCompanion,
 }) => {
+  const { content } = useCms();
   const [selectedService, setSelectedService] = useState('all');
   const [maxPrice, setMaxPrice] = useState<number>(3000);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -73,10 +75,10 @@ export const RandomMatchModal: React.FC<RandomMatchModalProps> = ({
             <Dices className="w-3.5 h-3.5 text-pink-600" /> Instant Matchmaker
           </div>
           <h3 className="text-2xl font-bold text-[#1d1d1f] tracking-tight font-display">
-            Book a Random Companion
+            {content.randomMatch?.modalTitle || 'Book a Random Companion'}
           </h3>
           <p className="text-xs text-[#86868b] mt-1 font-sans">
-            Set your filters and let our smart concierge pair you with a verified companion in {currentCity}
+            {content.randomMatch?.modalSubtitle || `Set your filters and let our smart concierge pair you with a verified companion in ${currentCity}`}
           </p>
         </div>
 

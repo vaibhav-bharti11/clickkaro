@@ -62,23 +62,29 @@ const SERVICE_VISUALS: Record<string, {
   },
 };
 
+import { useCms } from '../context/CmsContext';
+
 export const ServicesSection: React.FC<ServicesSectionProps> = ({ 
   onSelectService,
   isLoggedIn = false,
   onOpenAuth,
   onNavigateSeeker,
 }) => {
+  const { content } = useCms();
+  const servicesCms = content.services;
+  const servicesList = servicesCms.services && servicesCms.services.length > 0 ? servicesCms.services : ALL_SERVICES;
+
   const [activeFilter, setActiveFilter] = useState<'all' | 'day' | 'night'>('all');
 
   const filteredServices = useMemo(() => {
     if (activeFilter === 'day') {
-      return ALL_SERVICES.filter(s => ['hangout', 'lunch-dinner', 'coffee-partner'].includes(s.id));
+      return servicesList.filter(s => ['hangout', 'lunch-dinner', 'coffee-partner'].includes(s.id));
     }
     if (activeFilter === 'night') {
-      return ALL_SERVICES.filter(s => ['movie-partner', 'clubbing', 'travel-partner'].includes(s.id));
+      return servicesList.filter(s => ['movie-partner', 'clubbing', 'travel-partner'].includes(s.id));
     }
-    return ALL_SERVICES;
-  }, [activeFilter]);
+    return servicesList;
+  }, [activeFilter, servicesList]);
 
   return (
     <section id="services" className="py-28 sm:py-36 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-gradient-to-b from-[#FAF8F9] via-white to-[#F6F4F6] border-b border-black/5">
@@ -92,15 +98,15 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
         <div className="flex flex-col items-center text-center mb-16 sm:mb-20">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-pink-200/70 text-[#FF2D55] text-xs font-bold uppercase tracking-wider mb-5 shadow-sm">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Official Curated Services</span>
+            <span>{servicesCms.sectionBadge || 'Official Curated Services'}</span>
           </div>
 
           <h2 className="text-3xl sm:text-5xl lg:text-6xl font-display font-extrabold tracking-[-0.035em] text-[#1d1d1f] max-w-4xl leading-[1.08] headline-balance mb-6">
-            Curated verified companionship, designed around you.
+            {servicesCms.sectionTitle || 'Curated verified companionship, designed around you.'}
           </h2>
 
           <p className="text-[#1d1d1f]/75 text-base sm:text-lg max-w-2xl body-pretty font-sans font-normal leading-relaxed">
-            Six official launch packages with fixed durations, guaranteed transparent rates, and zero hidden platform surcharges across 12 cities.
+            {servicesCms.sectionSubtitle || 'Six official launch packages with fixed durations, guaranteed transparent rates, and zero hidden platform surcharges across 12 cities.'}
           </p>
 
           {/* Interactive Filter Pills */}

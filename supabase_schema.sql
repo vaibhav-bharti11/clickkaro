@@ -154,25 +154,47 @@ ALTER TABLE public.waitlist_leads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.companions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_assets ENABLE ROW LEVEL SECURITY;
 
--- Allow public inserts and selects for client app
+-- Allow public inserts and selects for client app (Idempotent)
+DROP POLICY IF EXISTS "Allow public insert to clients" ON public.clients;
 CREATE POLICY "Allow public insert to clients" ON public.clients FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public select clients" ON public.clients;
 CREATE POLICY "Allow public select clients" ON public.clients FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public update clients" ON public.clients;
 CREATE POLICY "Allow public update clients" ON public.clients FOR UPDATE USING (true);
 
+DROP POLICY IF EXISTS "Allow public insert to bookings" ON public.bookings;
 CREATE POLICY "Allow public insert to bookings" ON public.bookings FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public select bookings" ON public.bookings;
 CREATE POLICY "Allow public select bookings" ON public.bookings FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Allow public update bookings" ON public.bookings;
+CREATE POLICY "Allow public update bookings" ON public.bookings FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert to partner_applications" ON public.partner_applications;
 CREATE POLICY "Allow public insert to partner_applications" ON public.partner_applications FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public select partner_applications" ON public.partner_applications;
 CREATE POLICY "Allow public select partner_applications" ON public.partner_applications FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Allow public insert to waitlist_leads" ON public.waitlist_leads;
 CREATE POLICY "Allow public insert to waitlist_leads" ON public.waitlist_leads FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public select waitlist_leads" ON public.waitlist_leads;
 CREATE POLICY "Allow public select waitlist_leads" ON public.waitlist_leads FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Allow public read companions" ON public.companions;
 CREATE POLICY "Allow public read companions" ON public.companions FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert companions" ON public.companions;
 CREATE POLICY "Allow public insert companions" ON public.companions FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public update companions" ON public.companions;
 CREATE POLICY "Allow public update companions" ON public.companions FOR UPDATE USING (true);
 
-CREATE POLICY "Allow public update bookings" ON public.bookings FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public read site_assets" ON public.site_assets;
 CREATE POLICY "Allow public read site_assets" ON public.site_assets FOR SELECT USING (true);
 
 -- -------------------------------------------------------------------------
@@ -192,4 +214,30 @@ ON CONFLICT (id) DO UPDATE SET
   pin_code = EXCLUDED.pin_code,
   hourly_rate = EXCLUDED.hourly_rate,
   rating = EXCLUDED.rating;
+
+-- -------------------------------------------------------------------------
+-- CMS CONTENT TABLE (FOR 100% SITE-WIDE LIVE EDITING)
+-- -------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.cms_content (
+  id BIGINT PRIMARY KEY DEFAULT 1,
+  content JSONB NOT NULL,
+  version INTEGER DEFAULT 1,
+  updated_by TEXT DEFAULT 'admin',
+  updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW())
+);
+
+ALTER TABLE public.cms_content ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read cms_content" ON public.cms_content;
+CREATE POLICY "Allow public read cms_content" ON public.cms_content FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert cms_content" ON public.cms_content;
+CREATE POLICY "Allow public insert cms_content" ON public.cms_content FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public update cms_content" ON public.cms_content;
+CREATE POLICY "Allow public update cms_content" ON public.cms_content FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Allow public delete cms_content" ON public.cms_content;
+CREATE POLICY "Allow public delete cms_content" ON public.cms_content FOR DELETE USING (true);
+
 

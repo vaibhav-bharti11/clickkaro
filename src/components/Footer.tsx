@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowUp, ShieldCheck, Heart } from 'lucide-react';
 import { LegalPolicyModal } from './LegalPolicyModal';
+import { useCms } from '../context/CmsContext';
 
 interface FooterProps {
   onOpenBooking: () => void;
@@ -8,6 +9,9 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin }) => {
+  const { content, setIsLoginModalOpen, setIsCmsModalOpen, isAdminLoggedIn } = useCms();
+  const footerCms = content.footer;
+
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [legalModalOpen, setLegalModalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'privacy' | 'refund' | 'terms'>('privacy');
@@ -31,13 +35,13 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
 
   return (
     <>
-      <footer className="bg-white/60 backdrop-blur-xl text-[#86868b] py-16 text-xs border-t border-pink-200/50 relative z-10">
+      <footer className="bg-white/60 backdrop-blur-xl text-[#86868b] py-16 text-xs border-t border-pink-200/50 relative z-10 font-sans">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           
           {/* Top Legal Disclaimer */}
           <div className="pb-8 mb-8 border-b border-pink-200/50 text-[11px] leading-relaxed text-[#1d1d1f]/70">
             <p className="mb-2">
-              * Click Karo Date Karo is strictly a professional social companionship, lifestyle support, and daily care platform operated by <strong>Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD)</strong>. All interactions strictly follow our consent-first rules and professional code of conduct under the Information Technology Act, 2000. We do not provide dating, matrimonial, or adult escort services.
+              {footerCms.legalDisclaimer || `* Click Karo Date Karo is strictly a professional social companionship, lifestyle support, and daily care platform operated by ${footerCms.parentCompany}. All interactions strictly follow our consent-first rules and professional code of conduct under the Information Technology Act, 2000. We do not provide dating, matrimonial, or adult escort services.`}
             </p>
             <p>
               ** Earnings calculations are estimates based on standard partner hourly rates and weekly active bookings. Individual earnings may vary based on city, availability, and client reviews.
@@ -57,7 +61,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
                 />
               </div>
               <p className="mb-3 text-[11px] text-[#86868b] leading-relaxed">
-                India's #1 Social &amp; Lifestyle Support Platform. Safe, verified, consent-first companionship across premier cities in India.
+                {footerCms.tagline || "India's #1 Social & Lifestyle Support Platform. Safe, verified, consent-first companionship across premier cities in India."}
               </p>
               <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-pink-50 text-[#1d1d1f] text-[10px] font-semibold border border-pink-200">
                 <ShieldCheck className="w-3 h-3 text-[#0071e3]" /> 100% Face Verified
@@ -107,15 +111,22 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
               </button>
             </div>
 
-            {/* Support */}
+            {/* Support & Admin CMS */}
             <div className="flex flex-col gap-2.5">
               <h4 className="text-[#1d1d1f] font-bold text-xs tracking-tight">
                 Support &amp; Grievance
               </h4>
               <a href="#faq" className="hover:text-[#0071e3] transition">Help Center</a>
               <a href="#faq" className="hover:text-[#0071e3] transition">24/7 Safety SOS</a>
-              <span className="text-[11px] text-[#86868b] mt-1">grievance@kopartner.in</span>
-              <span className="text-[11px] text-[#86868b]">dpo@kopartner.in</span>
+              <span className="text-[11px] text-[#86868b] mt-1">{footerCms.grievanceEmail || 'grievance@kopartner.in'}</span>
+              <span className="text-[11px] text-[#86868b]">{footerCms.dpoEmail || 'dpo@kopartner.in'}</span>
+              
+              <button
+                onClick={() => isAdminLoggedIn ? setIsCmsModalOpen(true) : setIsLoginModalOpen(true)}
+                className="mt-2 text-[11px] font-bold text-[#FF2D55] hover:underline text-left cursor-pointer flex items-center gap-1"
+              >
+                <span>⚙️ {isAdminLoggedIn ? 'Live CMS Editor' : 'Admin CMS Portal'}</span>
+              </button>
             </div>
 
           </div>
@@ -123,7 +134,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
           {/* Bottom Copyright */}
           <div className="mt-12 pt-6 border-t border-pink-200/50 flex flex-col md:flex-row justify-between items-center gap-3 text-[11px] text-[#86868b]">
             <div>
-              Copyright &copy; 2025 Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD). All rights reserved.
+              {footerCms.copyrightText || `Copyright © 2025 ${footerCms.parentCompany}. All rights reserved.`}
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">

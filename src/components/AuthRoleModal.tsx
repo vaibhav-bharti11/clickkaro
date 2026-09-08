@@ -6,6 +6,7 @@ import { signInWithGoogle, sendPhoneOtp, verifyPhoneOtp, initPhoneRecaptcha, sig
 import { saveClientToSupabase, checkExistingClient } from '../services/supabase';
 import { LAUNCH_CITIES } from '../data/launchCities';
 import { validatePincode } from '../utils/pincodeValidator';
+import { useCms } from '../context/CmsContext';
 
 interface AuthRoleModalProps {
   isOpen: boolean;
@@ -27,8 +28,9 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
   onSelectRole, 
   initialMode = 'signup' 
 }) => {
+  const { loginAdmin } = useCms();
   const [step, setStep] = useState<'auth' | 'details' | 'role'>('auth');
-  const [authMethod, setAuthMethod] = useState<'google' | 'email' | 'phone'>('google');
+  const [authMethod, setAuthMethod] = useState<'google' | 'email' | 'phone' | 'admin'>('google');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>(initialMode);
   
   // User profile state
@@ -189,14 +191,30 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
     }
   };
 
-  // 1.1 Email & Password Authentication (Sign In & Sign Up)
+  // 1.1 Email & Password Authentication (Sign In & Sign Up & Admin Detection)
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !email.includes('@')) {
+    if (!email) {
+      setErrorMsg('Please enter your email address');
+      return;
+    }
+    if (!password) {
+      setErrorMsg('Please enter your password');
+      return;
+    }
+
+    // 1. First check if master admin / CMS login credentials
+    if (loginAdmin(email, password)) {
+      confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
+      onClose();
+      return;
+    }
+
+    if (!email.includes('@')) {
       setErrorMsg('Please enter a valid email address');
       return;
     }
-    if (!password || password.length < 6) {
+    if (password.length < 6) {
       setErrorMsg('Password must be at least 6 characters');
       return;
     }
@@ -368,7 +386,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
 
     await saveClientToSupabase({
       firebase_uid: firebaseUid || localStorage.getItem('ck_firebase_uid') || undefined,
-      auth_provider: authMethod,
+      auth_provider: (authMethod === 'admin' ? 'email' : authMethod) as 'google' | 'phone' | 'email',
       full_name: finalName,
       phone: phone,
       email: email || null,
@@ -448,20 +466,20 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
               </button>
             </div>
 
-            {/* 3-WAY AUTH METHOD TABS: GOOGLE / EMAIL & PASSWORD / PHONE OTP */}
-            <div className="flex bg-pink-100/70 p-1 rounded-2xl mb-5" role="tablist">
+            {/* 4-WAY AUTH METHOD TABS: GOOGLE / EMAIL & PASSWORD / PHONE OTP / ADMIN CMS */}
+            <div className="grid grid-cols-4 bg-pink-100/70 p-1 rounded-2xl mb-5 gap-1" role="tablist">
               <button
                 type="button"
                 role="tab"
                 aria-selected={authMethod === 'google'}
                 onClick={() => { setAuthMethod('google'); setErrorMsg(null); }}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-2 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${
                   authMethod === 'google' 
                     ? 'bg-white text-[#1d1d1f] shadow-sm' 
                     : 'text-[#86868b] hover:text-[#1d1d1f]'
                 }`}
               >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                <svg className="w-3 h-3" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                   <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
@@ -475,14 +493,14 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                 role="tab"
                 aria-selected={authMethod === 'email'}
                 onClick={() => { setAuthMethod('email'); setErrorMsg(null); }}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-2 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${
                   authMethod === 'email' 
                     ? 'bg-white text-[#1d1d1f] shadow-sm' 
                     : 'text-[#86868b] hover:text-[#1d1d1f]'
                 }`}
               >
-                <Mail className="w-3.5 h-3.5 text-[#0071e3]" />
-                <span>Email &amp; Pass</span>
+                <Mail className="w-3 h-3 text-[#0071e3]" />
+                <span>Email</span>
               </button>
 
               <button
@@ -490,14 +508,33 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                 role="tab"
                 aria-selected={authMethod === 'phone'}
                 onClick={() => { setAuthMethod('phone'); setErrorMsg(null); }}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-2 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${
                   authMethod === 'phone' 
                     ? 'bg-white text-[#1d1d1f] shadow-sm' 
                     : 'text-[#86868b] hover:text-[#1d1d1f]'
                 }`}
               >
-                <Phone className="w-3.5 h-3.5 text-[#0071e3]" />
+                <Phone className="w-3 h-3 text-[#0071e3]" />
                 <span>Phone OTP</span>
+              </button>
+
+              <button
+                type="button"
+                role="tab"
+                aria-selected={authMethod === 'admin'}
+                onClick={() => { 
+                  setAuthMethod('admin'); 
+                  setErrorMsg(null);
+                  if (!email) setEmail('admin@clickkarodatekaro.com');
+                }}
+                className={`py-2 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${
+                  authMethod === 'admin' 
+                    ? 'bg-stone-900 text-white shadow-sm' 
+                    : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                <Lock className="w-3 h-3 text-pink-400" />
+                <span>Admin CMS</span>
               </button>
             </div>
 
@@ -689,6 +726,91 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                   </form>
                 )}
               </div>
+            )}
+
+            {/* TAB 4: ADMIN CMS MASTER LOGIN */}
+            {authMethod === 'admin' && (
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setLoading(true);
+                  setErrorMsg(null);
+                  const success = loginAdmin(email, password);
+                  setLoading(false);
+                  if (success) {
+                    confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
+                    onClose();
+                  } else {
+                    setErrorMsg('Invalid admin credentials. Please enter authorized admin email/username and password.');
+                  }
+                }} 
+                className="space-y-3.5 text-left"
+              >
+                <div className="p-3 bg-stone-900 text-white rounded-2xl mb-2 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-pink-400 text-xs font-bold">
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Live Site CMS Control Center</span>
+                    </div>
+                    <p className="text-[11px] text-stone-300 mt-0.5">
+                      Direct access to edit 100% of website copy, pricing, images &amp; FAQs.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1d1d1f] mb-1">
+                    Admin Email / Master Username
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-[#86868b] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="admin@clickkarodatekaro.com"
+                      className="w-full bg-[#fdf8f8] border border-pink-200 rounded-xl pl-10 pr-3.5 py-2.5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1d1d1f] mb-1">
+                    Master Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-[#86868b] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-[#fdf8f8] border border-pink-200 rounded-xl pl-10 pr-3.5 py-2.5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-stone-900 to-pink-900 hover:from-black hover:to-pink-950 text-white py-3 rounded-full font-bold text-xs sm:text-sm transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Lock className="w-4 h-4 text-pink-400" />
+                  )}
+                  <span>Access Live Website CMS</span>
+                </button>
+
+                <div className="text-center pt-1">
+                  <span className="text-[11px] text-stone-400">
+                    Default Master: <code className="bg-stone-100 px-1 py-0.5 rounded text-stone-700">admin</code> / <code className="bg-stone-100 px-1 py-0.5 rounded text-stone-700">Admin@ClickKaro2025!</code>
+                  </span>
+                </div>
+              </form>
             )}
           </div>
         )}

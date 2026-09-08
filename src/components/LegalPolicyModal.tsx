@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, ShieldCheck, Lock, RefreshCw, FileText, CheckCircle2, AlertTriangle, Building2, Scale } from 'lucide-react';
+import { useCms } from '../context/CmsContext';
 
 export type PolicyTab = 'privacy' | 'refund' | 'terms';
 
@@ -14,6 +15,7 @@ export const LegalPolicyModal: React.FC<LegalPolicyModalProps> = ({
   onClose,
   initialTab = 'privacy',
 }) => {
+  const { content } = useCms();
   const [activeTab, setActiveTab] = useState<PolicyTab>(initialTab);
 
   if (!isOpen) return null;
@@ -42,7 +44,7 @@ export const LegalPolicyModal: React.FC<LegalPolicyModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-[#6B7280]">
-                Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD)
+                {content.footer?.brandName || 'Click Karo Date Karo'} ({content.footer?.parentCompany || 'A unit of AMBER VENTURES (OPC) PVT LTD'})
               </p>
             </div>
           </div>

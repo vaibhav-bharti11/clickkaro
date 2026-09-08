@@ -22,6 +22,8 @@ import { BuyServicesModal } from './components/BuyServicesModal';
 import { ServiceItem, UserRole, CompanionProfile, BookingContext, ServiceCredit } from './types';
 import { ALL_SERVICES } from './data/servicesData';
 import { subscribeToAuthChanges } from './services/firebase';
+import { CmsProvider, useCms } from './context/CmsContext';
+import { AdminCmsModal } from './components/AdminCmsModal';
 
 export type AppView = 'landing' | 'dashboard' | 'seeker' | 'companion' | 'my-services';
 
@@ -53,7 +55,14 @@ const DEFAULT_USED_CREDITS: ServiceCredit[] = [
   }
 ];
 
-export const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { 
+    isCmsModalOpen, 
+    setIsCmsModalOpen, 
+    isLoginModalOpen, 
+    setIsLoginModalOpen 
+  } = useCms();
+
   const [currentView, setCurrentView] = useState<AppView>('landing');
   const [userRole, setUserRole] = useState<UserRole | null>(() => {
     return (localStorage.getItem('ck_user_role') as UserRole) || null;
@@ -455,10 +464,13 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Interactive Modals */}
+      {/* Interactive Unified Auth & Admin Login Modal */}
       <AuthRoleModal 
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
+        isOpen={authModalOpen || isLoginModalOpen}
+        onClose={() => {
+          setAuthModalOpen(false);
+          setIsLoginModalOpen(false);
+        }}
         onSelectRole={handleRoleSelected}
         initialMode={authModalMode}
       />
@@ -481,7 +493,21 @@ export const App: React.FC = () => {
         isOpen={partnerModalOpen}
         onClose={() => setPartnerModalOpen(false)}
       />
+
+      {/* Admin CMS Dashboard Modal */}
+      <AdminCmsModal
+        isOpen={isCmsModalOpen}
+        onClose={() => setIsCmsModalOpen(false)}
+      />
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <CmsProvider>
+      <AppContent />
+    </CmsProvider>
   );
 };
 

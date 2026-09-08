@@ -1,18 +1,24 @@
 import React, { useState } from 'react';
 import { FAQS } from '../data/servicesData';
 import { ChevronDown, MessageCircle } from 'lucide-react';
+import { useCms } from '../context/CmsContext';
 
 interface FaqSectionProps {
   onOpenBooking: () => void;
 }
 
 export const FaqSection: React.FC<FaqSectionProps> = ({ onOpenBooking }) => {
+  const { content } = useCms();
+  const faqCms = content.faq;
+  const faqList = faqCms.faqs && faqCms.faqs.length > 0 ? faqCms.faqs : FAQS;
+  const categories = faqCms.categories && faqCms.categories.length > 0 
+    ? faqCms.categories 
+    : ['All', 'Safety', 'Booking', 'Earnings', 'Partners', 'Pricing'];
+
   const [openId, setOpenId] = useState<string>('faq-1');
   const [activeCategory, setActiveCategory] = useState<string>('All');
 
-  const categories = ['All', 'Safety', 'Booking', 'Earnings', 'Partners', 'Pricing'];
-
-  const filteredFaqs = FAQS.filter(
+  const filteredFaqs = faqList.filter(
     (faq) => activeCategory === 'All' || faq.category === activeCategory
   );
 
@@ -21,19 +27,19 @@ export const FaqSection: React.FC<FaqSectionProps> = ({ onOpenBooking }) => {
   };
 
   return (
-    <section id="faq" className="py-24 px-4 sm:px-6 border-b border-pink-200/50 relative z-10">
+    <section id="faq" className="py-24 px-4 sm:px-6 border-b border-pink-200/50 relative z-10 font-sans">
       <div className="max-w-4xl mx-auto">
         
         {/* Header */}
         <div className="text-center mb-14">
           <span className="text-xs font-semibold text-[#0071e3] uppercase tracking-wider mb-2 block">
-            Common Inquiries
+            {faqCms.sectionBadge || 'Common Inquiries'}
           </span>
           <h2 className="text-3xl sm:text-5xl font-semibold tracking-tight text-[#1d1d1f] mb-3 headline-balance">
-            Frequently Asked Questions.
+            {faqCms.sectionTitle || 'Frequently Asked Questions.'}
           </h2>
           <p className="text-base text-[#1d1d1f]/75 max-w-lg mx-auto body-pretty">
-            Everything you need to know about safety protocols, booking procedures, and partner payouts.
+            {faqCms.sectionSubtitle || 'Everything you need to know about safety protocols, booking procedures, and partner payouts.'}
           </p>
 
           {/* Category Filter Pills */}

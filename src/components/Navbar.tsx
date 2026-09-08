@@ -3,6 +3,7 @@ import { Menu, X, ArrowRight, LogOut, ShieldCheck, Sparkles, CheckCircle2 } from
 import { UserRole } from '../types';
 import { LegalPolicyModal } from './LegalPolicyModal';
 import { UpcomingEventsModal } from './UpcomingEventsModal';
+import { useCms } from '../context/CmsContext';
 
 interface NavbarProps {
   onOpenBooking: () => void;
@@ -29,6 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onSwitchMode,
 }) => {
+  const { content } = useCms();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -156,7 +158,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onOpenAuth('signin')}
               className="bg-gradient-to-r from-[#FF2D55] via-[#E11D48] to-[#9333EA] text-white text-xs sm:text-[13px] font-bold px-4 py-1.5 rounded-full shadow-apple-sm hover:shadow-apple-md hover:opacity-95 active:scale-95 transition-all apple-focus cursor-pointer whitespace-nowrap"
             >
-              Sign Up / Login
+              {content.navbar?.loginButtonText || 'Sign Up / Login'}
             </button>
           )}
         </nav>
@@ -316,7 +318,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => { setMobileMenuOpen(false); onOpenAuth('signin'); }}
                 className="w-full bg-gradient-to-r from-[#FF2D55] via-[#E11D48] to-[#9333EA] text-white py-3.5 rounded-2xl font-bold text-xs shadow-md cursor-pointer"
               >
-                Sign Up / Login
+                {content.navbar?.loginButtonText || 'Sign Up / Login'}
               </button>
             )}
           </div>

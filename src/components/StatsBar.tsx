@@ -1,62 +1,32 @@
 import React from 'react';
-import { Users, MapPin, ShieldCheck, Headphones } from 'lucide-react';
+import { Users, MapPin, ShieldCheck, Headphones, Star, Lock } from 'lucide-react';
+import { useCms } from '../context/CmsContext';
+
+const ICON_MAP: Record<string, any> = {
+  Users,
+  MapPin,
+  ShieldCheck,
+  Headphones,
+  Star,
+  Lock,
+};
 
 export const StatsBar: React.FC = () => {
-  const stats = [
-    {
-      icon: Users,
-      value: '1,000+',
-      label: 'Curated Partners',
-      sublabel: 'Across Delhi NCR, Mumbai & premier hubs',
-      color: 'from-[#FF2D55] to-[#E11D48]',
-      textColor: 'text-[#FF2D55]',
-      bgLight: 'bg-[#FF2D55]/10',
-      borderLight: 'border-[#FF2D55]/20',
-    },
-    {
-      icon: MapPin,
-      value: '12+',
-      label: 'Launch Metros',
-      sublabel: 'Delhi NCR, Mumbai, Bangalore, Jaipur & more',
-      color: 'from-[#FF5E3A] to-[#F59E0B]',
-      textColor: 'text-[#FF5E3A]',
-      bgLight: 'bg-[#FF5E3A]/10',
-      borderLight: 'border-[#FF5E3A]/20',
-    },
-    {
-      icon: ShieldCheck,
-      value: '100%',
-      label: 'AI-Verified Profiles',
-      sublabel: 'Aadhaar, PAN & background screened',
-      color: 'from-[#10B981] to-[#06B6D4]',
-      textColor: 'text-[#10B981]',
-      bgLight: 'bg-[#10B981]/10',
-      borderLight: 'border-[#10B981]/20',
-    },
-    {
-      icon: Headphones,
-      value: '24/7',
-      label: 'Live SOS Support',
-      sublabel: 'In-app safety tracking & rapid response',
-      color: 'from-[#0071E3] to-[#7928CA]',
-      textColor: 'text-[#0071E3]',
-      bgLight: 'bg-[#0071E3]/10',
-      borderLight: 'border-[#0071E3]/20',
-    },
-  ];
+  const { content } = useCms();
+  const cmsStats = content.statsBar?.stats || [];
 
   return (
     <section className="py-14 px-4 md:px-6 bg-white/60 backdrop-blur-xl border-y border-black/5">
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {stats.map((stat, idx) => {
-            const Icon = stat.icon;
+          {cmsStats.map((stat, idx) => {
+            const Icon = ICON_MAP[stat.iconName] || ShieldCheck;
             return (
               <div 
-                key={idx}
+                key={stat.id || idx}
                 className="bg-white/90 backdrop-blur-2xl rounded-3xl p-6 border border-black/5 shadow-sm transition-all duration-300 hover:bg-white hover:border-black/10 hover:shadow-apple-lg hover:-translate-y-1 group"
               >
-                <div className={`w-12 h-12 rounded-2xl ${stat.bgLight} border ${stat.borderLight} flex items-center justify-center ${stat.textColor} mb-4 group-hover:scale-110 transition-transform duration-300 shadow-sm`}>
+                <div className="w-12 h-12 rounded-2xl bg-pink-50 border border-pink-100 flex items-center justify-center text-pink-600 mb-4 group-hover:scale-110 transition-transform duration-300 shadow-sm">
                   <Icon className="w-6 h-6" aria-hidden="true" />
                 </div>
                 <div className="text-3xl sm:text-4xl font-display font-extrabold tracking-tight text-[#1d1d1f] mb-1 tabular-numbers">
@@ -66,7 +36,7 @@ export const StatsBar: React.FC = () => {
                   {stat.label}
                 </div>
                 <p className="text-xs text-[#86868b] mt-1 leading-snug font-sans">
-                  {stat.sublabel}
+                  {stat.subtext}
                 </p>
               </div>
             );

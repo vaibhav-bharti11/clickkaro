@@ -972,6 +972,8 @@ export const fetchCompanionsFromSupabase = async (filter?: {
   }
 };
 
+export const fetchProfilesFromSupabase = fetchCompanionsFromSupabase;
+
 // -------------------------------------------------------------------------
 // 9.1 GET TOP 5 COMPANIONS BY PIN CODE OR DISTRICT
 // -------------------------------------------------------------------------
