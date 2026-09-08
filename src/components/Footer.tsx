@@ -53,12 +53,18 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
             
             {/* Brand Column */}
             <div className="col-span-2 md:col-span-1">
-              <div className="flex items-center gap-2 text-[#1d1d1f] mb-3">
+              <div className="flex flex-col text-[#1d1d1f] mb-3">
                 <img 
                   src="/assets/brand_logo.png" 
                   alt="Click Karo Date Karo" 
-                  className="h-10 w-auto object-contain"
+                  className="h-10 w-auto object-contain self-start mb-1.5"
                 />
+                <span className="text-[11px] font-bold text-pink-700 leading-tight">
+                  Click Karo Date Karo
+                </span>
+                <span className="text-[10px] text-stone-500 font-medium leading-tight">
+                  (A unit of Amber Ventures (OPC) PVT LTD)
+                </span>
               </div>
               <p className="mb-3 text-[11px] text-[#86868b] leading-relaxed">
                 {footerCms.tagline || "India's #1 Social & Lifestyle Support Platform. Safe, verified, consent-first companionship across premier cities in India."}
@@ -134,7 +140,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
           {/* Bottom Copyright */}
           <div className="mt-12 pt-6 border-t border-pink-200/50 flex flex-col md:flex-row justify-between items-center gap-3 text-[11px] text-[#86868b]">
             <div>
-              {footerCms.copyrightText || `Copyright © 2025 ${footerCms.parentCompany}. All rights reserved.`}
+              {footerCms.copyrightText || `Copyright © 2025 Click Karo Date Karo (${footerCms.parentCompany || 'A unit of Amber Ventures (OPC) PVT LTD'}). All rights reserved.`}
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
