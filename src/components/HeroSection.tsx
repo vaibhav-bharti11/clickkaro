@@ -169,7 +169,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#FF2D55]" />
             </span>
             <span className="text-[11px] sm:text-xs md:text-sm font-extrabold text-pink-800 tracking-wide text-center">
-              India-wide coverage &bull; Verified profiles &bull; Privacy-focused &bull; Professional support
+              India’s #1 Lifestyle Partner &bull; Pan-India Availability &bull; Genuine Connections &bull; Privacy-Focused &bull; Professional Support
             </span>
           </div>
 
@@ -182,12 +182,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
           {/* Bold Core Headline with High Contrast & Colour Popping Effect */}
           <h1 className="font-display font-black text-[#09090b] text-4xl sm:text-6xl md:text-7xl lg:text-8xl leading-[1.04] tracking-[-0.035em] mb-4 drop-shadow-[0_2px_8px_rgba(255,255,255,0.9)]">
-            Click. <span className="bg-gradient-to-r from-[#FF0055] via-[#E11D48] to-[#8B5CF6] bg-clip-text text-transparent filter drop-shadow-[0_4px_16px_rgba(255,0,85,0.4)]">Connect.</span> Date.
+            CLICK &bull; <span className="bg-gradient-to-r from-[#FF0055] via-[#E11D48] to-[#8B5CF6] bg-clip-text text-transparent filter drop-shadow-[0_4px_16px_rgba(255,0,85,0.4)]">CONNECT</span> &bull; MEETUP
           </h1>
 
           {/* Client Description Paragraph (Semibold high-contrast ink for 100% effortless readability) */}
           <p className="text-[#111827] text-base sm:text-lg md:text-xl max-w-3xl mx-auto mb-8 font-sans leading-relaxed font-semibold drop-shadow-[0_1px_3px_rgba(255,255,255,0.95)]">
-            Discover genuine people, explore new connections and find someone who matches your interests. Click Karo Date Karo makes it simple to connect, chat and plan meaningful dates in a safe and respectful environment.
+            Meet genuine people, enjoy good conversations and make every moment more social. Click Karo Date Karo makes it easy to connect with someone for coffee, lunch, dinner, hangouts and meetups — all in a safe, respectful and comfortable environment.
           </p>
 
           {/* Action Buttons with High-Voltage Colour Pop & Spring Micro-Motion */}

@@ -29,10 +29,10 @@ const DEFAULT_AVAILABLE_CREDITS: ServiceCredit[] = [
   {
     id: 'cred-1',
     serviceId: 'hangout',
-    serviceName: 'Hangout Outing',
-    displayTitle: 'Hangout Outing Partner',
-    price: '₹1,770.00',
-    priceNum: 1770,
+    serviceName: 'Hangout',
+    displayTitle: 'Hangout (4 Hours)',
+    price: '₹7,999.00',
+    priceNum: 7999,
     purchasedDate: 'Purchased 9/2/2026',
     status: 'available',
   }
@@ -42,10 +42,10 @@ const DEFAULT_USED_CREDITS: ServiceCredit[] = [
   {
     id: 'used-1',
     serviceId: 'hangout',
-    serviceName: 'Hangout Outing',
+    serviceName: 'Hangout',
     displayTitle: 'Hangout (4 Hours)',
-    price: '₹1,770.00',
-    priceNum: 1770,
+    price: '₹7,999.00',
+    priceNum: 7999,
     purchasedDate: 'Purchased 8/28/2026',
     bookingCode: 'Booking: #CK-A17337',
     status: 'used',

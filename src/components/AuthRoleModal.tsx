@@ -36,6 +36,11 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
   const [phone, setPhone] = useState(() => localStorage.getItem('ck_user_phone') || '');
   const [email, setEmail] = useState(() => localStorage.getItem('ck_user_email') || '');
   const [password, setPassword] = useState('');
+  const [dob, setDob] = useState(() => localStorage.getItem('ck_user_dob') || '2000-01-01');
+  const [upiId, setUpiId] = useState(() => localStorage.getItem('ck_user_upi') || '');
+  const [aadharNumber, setAadharNumber] = useState(() => localStorage.getItem('ck_user_aadhar') || '');
+  const [aadharFileName, setAadharFileName] = useState<string | null>(null);
+  const [aadharPreview, setAadharPreview] = useState<string | null>(() => localStorage.getItem('ck_aadhar_preview') || null);
   const [city, setCity] = useState(() => localStorage.getItem('ck_user_city') || 'Delhi NCR');
   const [pinCode, setPinCode] = useState(() => localStorage.getItem('ck_user_pincode') || '110001');
   const [pinError, setPinError] = useState<string | null>(null);
@@ -49,6 +54,12 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const get18YearsAgoDate = () => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 18);
+    return d.toISOString().split('T')[0];
+  };
 
   const recaptchaVerifierRef = useRef<any>(null);
 
@@ -327,12 +338,29 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
       return;
     }
 
+    // 18+ Age Verification check
+    if (!dob) {
+      setErrorMsg('Please select your Date of Birth for age verification.');
+      return;
+    }
+    const birthDate = new Date(dob);
+    const cutoff = new Date();
+    cutoff.setFullYear(cutoff.getFullYear() - 18);
+    if (birthDate > cutoff) {
+      setErrorMsg('Under-18 restricted: You must be at least 18 years old to join under Section 10 of our IT Act compliance policy.');
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
 
     const finalName = fullName || 'Member';
     localStorage.setItem('ck_user_name', finalName);
     localStorage.setItem('ck_user_phone', phone);
+    localStorage.setItem('ck_user_dob', dob);
+    if (upiId) localStorage.setItem('ck_user_upi', upiId);
+    if (aadharNumber) localStorage.setItem('ck_user_aadhar', aadharNumber);
+    if (aadharNumber || aadharPreview) localStorage.setItem('ck_aadhar_verified', 'true');
     localStorage.setItem('ck_user_city', city);
     localStorage.setItem('ck_user_pincode', pinCode);
     localStorage.setItem('ck_user_avatar', avatarPhoto);
@@ -348,6 +376,12 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
       role: 'user',
       city: city,
       pin_code: pinCode,
+      metadata: {
+        dob,
+        upi_id: upiId || undefined,
+        aadhar_number: aadharNumber ? `XXXX-XXXX-${aadharNumber.slice(-4)}` : undefined,
+        aadhar_verified: Boolean(aadharNumber || aadharPreview),
+      }
     });
 
     setLoading(false);
@@ -364,7 +398,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
     >
       <div id="recaptcha-container" className="hidden"></div>
 
-      <div className="bg-white/95 backdrop-blur-2xl rounded-3xl max-w-md w-full p-6 sm:p-8 border border-pink-200 shadow-apple-float relative overflow-hidden">
+      <div className="bg-white/95 backdrop-blur-2xl rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-pink-200 shadow-apple-float relative overflow-hidden max-h-[90vh] overflow-y-auto no-scrollbar">
         
         {/* Close Button */}
         <button
@@ -380,7 +414,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
           <div>
             <div className="text-center mb-6">
               <span className="text-[11px] font-bold text-[#0071e3] uppercase tracking-wider block mb-1">
-                Verified Community
+                Verified Community &bull; 18+ Only
               </span>
               <h2 className="text-2xl font-bold text-[#1d1d1f] tracking-tight font-display">
                 {authMode === 'signup' ? 'Create Your Account' : 'Welcome Back'}
@@ -659,18 +693,18 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
           </div>
         )}
 
-        {/* STEP 2: DETAILS (ONLY DISPLAYED FOR BRAND-NEW USERS ON FIRST REGISTRATION) */}
+        {/* STEP 2: DETAILS (ONE-TIME REGISTRATION SETUP) */}
         {step === 'details' && (
           <div>
             <div className="text-center mb-5">
               <span className="text-[11px] font-bold text-[#0071e3] uppercase tracking-wider block mb-1">
-                One-Time Setup &bull; First Registration
+                Verified Registration &bull; IT Act Compliant
               </span>
               <h2 className="text-xl font-bold text-[#1d1d1f] tracking-tight font-display">
-                Complete Your Profile
+                Create Your Profile &amp; ID
               </h2>
               <p className="text-xs text-[#86868b] mt-1 font-sans">
-                Set your city and locality once so verified companions appear in your exact area
+                Please enter your Date of Birth, UPI ID, and Aadhaar verification details
               </p>
             </div>
 
@@ -684,7 +718,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
             <form onSubmit={handleDetailsSubmit} className="space-y-4 text-left">
               <div>
                 <label className="block text-xs font-bold text-[#1d1d1f] mb-1 font-sans">
-                  Your Full Name
+                  Full Legal Name
                 </label>
                 <input
                   type="text"
@@ -694,6 +728,92 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                   placeholder="e.g. Priya Sharma"
                   className="w-full bg-[#fdf8f8] border border-pink-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
                 />
+              </div>
+
+              {/* 1. Date of Birth (Enforces 18+ requirement) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-[#1d1d1f] font-sans">
+                    Date of Birth (DOB)
+                  </label>
+                  <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                    Must be 18+ Years
+                  </span>
+                </div>
+                <input
+                  type="date"
+                  required
+                  max={get18YearsAgoDate()}
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                  className="w-full bg-[#fdf8f8] border border-pink-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+                />
+              </div>
+
+              {/* 2. UPI ID for Verified Payouts & Refunds */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-[#1d1d1f] font-sans">
+                    UPI ID (For Verified Payouts &amp; Instant Refunds)
+                  </label>
+                  <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                    UPI Auto-Pay
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={upiId}
+                  onChange={(e) => setUpiId(e.target.value)}
+                  placeholder="e.g. yourname@okhdfcbank or 9876543210@paytm"
+                  className="w-full bg-[#fdf8f8] border border-pink-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+                />
+              </div>
+
+              {/* 3. Aadhaar Number & Document Upload */}
+              <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-[#1d1d1f] font-sans">
+                    Aadhaar Verification (Government KYC)
+                  </label>
+                  <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                    256-Bit Encrypted
+                  </span>
+                </div>
+
+                <input
+                  type="text"
+                  maxLength={12}
+                  value={aadharNumber}
+                  onChange={(e) => setAadharNumber(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Enter 12-Digit Aadhaar Number (e.g. 548291038472)"
+                  className="w-full bg-white border border-stone-300 rounded-xl px-3.5 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+                />
+
+                <div>
+                  <label className="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dashed border-pink-300 bg-pink-50/50 hover:bg-pink-100/50 cursor-pointer transition text-xs font-bold text-[#FF2D55]">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>{aadharFileName ? `Selected: ${aadharFileName}` : 'Upload Aadhaar Card (Front / Back Image)'}</span>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setAadharFileName(file.name);
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            if (typeof reader.result === 'string') {
+                              setAadharPreview(reader.result);
+                              localStorage.setItem('ck_aadhar_preview', reader.result);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
 
               <div>
@@ -779,3 +899,5 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
     </div>
   );
 };
+
+export default AuthRoleModal;

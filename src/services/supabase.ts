@@ -87,6 +87,10 @@ export const saveClientToSupabase = async (clientData: ClientRecord): Promise<{ 
           city: clientData.city || existing.city,
           pin_code: clientData.pin_code || existing.pin_code,
           role: clientData.role || existing.role,
+          metadata: {
+            ...(existing.metadata || {}),
+            ...(clientData.metadata || {}),
+          },
           last_active_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })

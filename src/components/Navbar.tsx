@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, ArrowRight, LogOut, ShieldCheck, Sparkles, CheckCircle2, Lock } from 'lucide-react';
+import { Menu, X, ArrowRight, LogOut, ShieldCheck, Sparkles, CheckCircle2 } from 'lucide-react';
 import { UserRole } from '../types';
+import { LegalPolicyModal } from './LegalPolicyModal';
+import { UpcomingEventsModal } from './UpcomingEventsModal';
 
 interface NavbarProps {
   onOpenBooking: () => void;
   onOpenPartnerJoin: () => void;
   onOpenSearch: () => void;
   onOpenAuth: (mode?: 'signin' | 'signup') => void;
+  onOpenEvents?: () => void;
   currentRole?: UserRole;
   userName?: string;
   userAvatar?: string;
@@ -17,7 +20,10 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
+  onOpenBooking,
+  onOpenPartnerJoin: _onOpenPartnerJoin,
   onOpenAuth,
+  onOpenEvents,
   userName,
   userAvatar,
   onLogout,
@@ -26,7 +32,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
-  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [legalTab, setLegalTab] = useState<'privacy' | 'refund' | 'terms'>('privacy');
+  const [showEventsModal, setShowEventsModal] = useState(false);
+
+  const handleOpenUpcomingEvents = () => {
+    if (onOpenEvents) {
+      onOpenEvents();
+    } else {
+      setShowEventsModal(true);
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -47,7 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Main Translucent Glass Navigation Bar - Compact Apple Floating Pill */}
         <nav 
           aria-label="Main Navigation"
-          className="h-15 apple-glass rounded-full inline-flex items-center gap-2 sm:gap-3 px-5 sm:px-6 shadow-apple-md transition-all duration-300 hover:border-pink-300 border border-pink-200/80"
+          className="h-15 apple-glass rounded-full inline-flex items-center gap-1.5 sm:gap-2.5 px-5 sm:px-6 shadow-apple-md transition-all duration-300 hover:border-pink-300 border border-pink-200/80"
         >
           {/* 1. Left: Logo */}
           <button 
@@ -73,7 +89,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             Services
           </a>
 
-          {/* 3. About Us */}
+          {/* 3. Upcoming Events (Requested by user) */}
+          <button 
+            type="button"
+            onClick={handleOpenUpcomingEvents}
+            className="text-xs sm:text-[13px] font-bold text-[#FF2D55] hover:text-[#E11D48] transition-colors px-3 py-1.5 rounded-full hover:bg-pink-50/80 apple-focus cursor-pointer whitespace-nowrap flex items-center gap-1.5"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-[#FF2D55]" />
+            <span>Upcoming Events</span>
+          </button>
+
+          {/* 4. About Us */}
           <button 
             type="button"
             onClick={() => setShowAboutModal(true)}
@@ -82,10 +108,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             About Us
           </button>
 
-          {/* 4. Privacy Policy */}
+          {/* 5. Privacy & Legal Policy */}
           <button 
             type="button"
-            onClick={() => setShowPrivacyModal(true)}
+            onClick={() => { setLegalTab('privacy'); setShowLegalModal(true); }}
             className="text-xs sm:text-[13px] font-bold text-[#1d1d1f] hover:text-[#0071e3] transition-colors px-3 py-1.5 rounded-full hover:bg-black/[0.04] apple-focus cursor-pointer whitespace-nowrap"
           >
             Privacy Policy
@@ -93,7 +119,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <div className="h-5 w-px bg-pink-200/80 mx-1 shrink-0"></div>
 
-          {/* 5. Sign Up / Login (or Active User Profile Badge) */}
+          {/* 6. Sign Up / Login (or Active User Profile Badge) */}
           {userName ? (
             <div className="flex items-center gap-2 shrink-0">
               <button
@@ -217,7 +243,23 @@ export const Navbar: React.FC<NavbarProps> = ({
             <ArrowRight className="w-4 h-4 text-stone-400" />
           </a>
 
-          {/* 2. About Us */}
+          {/* 2. Upcoming Events (Requested by user) */}
+          <button 
+            type="button"
+            onClick={() => { 
+              setMobileMenuOpen(false); 
+              handleOpenUpcomingEvents();
+            }}
+            className="text-left text-base font-bold text-[#FF2D55] hover:text-[#E11D48] transition py-2.5 px-3.5 rounded-2xl hover:bg-pink-50/60 flex items-center justify-between cursor-pointer"
+          >
+            <span className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#FF2D55]" />
+              <span>Upcoming Events</span>
+            </span>
+            <ArrowRight className="w-4 h-4 text-[#FF2D55]" />
+          </button>
+
+          {/* 3. About Us */}
           <button 
             type="button"
             onClick={() => { setMobileMenuOpen(false); setShowAboutModal(true); }}
@@ -227,17 +269,27 @@ export const Navbar: React.FC<NavbarProps> = ({
             <ArrowRight className="w-4 h-4 text-stone-400" />
           </button>
 
-          {/* 3. Privacy Policy */}
+          {/* 4. Privacy & IT Act Policy */}
           <button 
             type="button"
-            onClick={() => { setMobileMenuOpen(false); setShowPrivacyModal(true); }}
+            onClick={() => { setMobileMenuOpen(false); setLegalTab('privacy'); setShowLegalModal(true); }}
             className="text-left text-base font-bold text-[#1d1d1f] hover:text-[#0071e3] transition py-2.5 px-3.5 rounded-2xl hover:bg-pink-50/60 flex items-center justify-between cursor-pointer"
           >
-            <span>Privacy Policy</span>
+            <span>Privacy Policy (IT Act 2000)</span>
             <ArrowRight className="w-4 h-4 text-stone-400" />
           </button>
 
-          {/* 4. Sign Up / Login */}
+          {/* 5. Refund & Cancellation */}
+          <button 
+            type="button"
+            onClick={() => { setMobileMenuOpen(false); setLegalTab('refund'); setShowLegalModal(true); }}
+            className="text-left text-base font-bold text-[#1d1d1f] hover:text-[#0071e3] transition py-2.5 px-3.5 rounded-2xl hover:bg-pink-50/60 flex items-center justify-between cursor-pointer"
+          >
+            <span>Refund Policy (100% Refund)</span>
+            <ArrowRight className="w-4 h-4 text-stone-400" />
+          </button>
+
+          {/* 6. Sign Up / Login */}
           <div className="pt-6 mt-4 border-t border-pink-100">
             {userName ? (
               <div className="space-y-2.5">
@@ -296,7 +348,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>India's Premier Social Companionship Platform</span>
                 </p>
                 <p className="text-xs text-stone-600">
-                  Click Karo Date Karo was established with a singular vision: to create a secure, dignified, and verified social space where people can find trusted, cultured companions for outings, movie screenings, coffee conversations, dining, and city tours.
+                  Operated by Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD). Click Karo Date Karo was established to create a secure, dignified, and verified social space where people can find trusted, cultured companions for outings, blockbusters, coffee conversations, dining, and city tours.
                 </p>
               </div>
 
@@ -318,18 +370,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <span><strong>Zero Harassment Tolerance:</strong> Transparent code of conduct ensuring mutual respect, clear boundaries, and high dignity.</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>Direct Connect &amp; No Hidden Fees:</strong> Direct phone call coordination after mutual confirmation with zero extra commission.</span>
-                  </li>
                 </ul>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-[#111827] text-sm mb-1.5">Live Across 10 Operational Cities</h4>
-                <p className="text-xs text-stone-500">
-                  Delhi NCR, Mumbai, Bangalore, Chandigarh, Dehradun, Gurgaon, Noida, Jaipur, Meerut, and Indore.
-                </p>
               </div>
 
               <div className="pt-2">
@@ -346,72 +387,22 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       )}
 
-      {/* PRIVACY POLICY MODAL */}
-      {showPrivacyModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-pink-200 shadow-apple-float max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-stone-100">
-              <div className="flex items-center gap-3">
-                <Lock className="w-5 h-5 text-[#0071e3]" />
-                <span className="font-display font-bold text-lg text-[#111827]">Privacy &amp; Safety Policy</span>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setShowPrivacyModal(false)}
-                className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-500 cursor-pointer transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      {/* LEGAL & PRIVACY POLICY MODAL (IT Act, 2000 & IT Rules 2011) */}
+      <LegalPolicyModal
+        isOpen={showLegalModal}
+        onClose={() => setShowLegalModal(false)}
+        initialTab={legalTab}
+      />
 
-            <div className="space-y-4 text-xs sm:text-sm text-stone-600 leading-relaxed font-sans">
-              <p className="text-xs text-stone-500">
-                Last Updated: September 2026. Click Karo Date Karo is dedicated to safeguarding the confidentiality, safety, and personal data of every seeker and companion.
-              </p>
-
-              <div className="space-y-3">
-                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
-                  <h5 className="font-bold text-[#111827] text-xs mb-1">1. Phone Number &amp; Contact Masking</h5>
-                  <p className="text-xs text-stone-600">
-                    Your personal mobile number and private contacts are never publicly viewable on open profiles. Companion and client numbers are only unlocked between the two confirmed parties upon booking acceptance.
-                  </p>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
-                  <h5 className="font-bold text-[#111827] text-xs mb-1">2. Identity &amp; KYC Protection</h5>
-                  <p className="text-xs text-stone-600">
-                    Aadhaar records and live face verifications are encrypted under strict compliance with Indian IT Act provisions. Documents are exclusively used for safety auditing and are never sold or marketed.
-                  </p>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
-                  <h5 className="font-bold text-[#111827] text-xs mb-1">3. Payment &amp; Wallet Security</h5>
-                  <p className="text-xs text-stone-600">
-                    All payment transactions, subscription recharges, and payouts use RBI-authorized payment gateways (UPI, Razorpay, NetBanking) protected by 256-bit SSL encryption. We never store credit card or CVV details.
-                  </p>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
-                  <h5 className="font-bold text-[#111827] text-xs mb-1">4. Zero Third-Party Data Selling</h5>
-                  <p className="text-xs text-stone-600">
-                    We maintain a strict zero-sharing policy: your activity history, location logs, and communication details are never sold, rented, or distributed to advertising networks.
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPrivacyModal(false)}
-                  className="w-full py-3 rounded-2xl bg-[#111827] hover:bg-[#0071e3] text-white font-bold text-xs transition cursor-pointer"
-                >
-                  I Understand &amp; Agree
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* UPCOMING EVENTS MODAL */}
+      <UpcomingEventsModal
+        isOpen={showEventsModal}
+        onClose={() => setShowEventsModal(false)}
+        onBookEventPartner={(_event) => {
+          setShowEventsModal(false);
+          onOpenBooking();
+        }}
+      />
     </>
   );
 };

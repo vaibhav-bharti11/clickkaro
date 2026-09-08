@@ -39,6 +39,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinSuccess, setPinSuccess] = useState<string | null>(null);
   const [date, setDate] = useState('');
+  const [timeSlot, setTimeSlot] = useState('06:00 PM');
   const [hours, setHours] = useState<number>(4);
   const [submitted, setSubmitted] = useState(false);
   const [confirmedBookingCode, setConfirmedBookingCode] = useState<string>('');
@@ -186,6 +187,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     if (city) localStorage.setItem('ck_user_city', city);
     if (pinCode) localStorage.setItem('ck_user_pincode', pinCode);
 
+    const fullDateTime = `${date} at ${timeSlot} (${hours} Hours)`;
+
     // Ingest to Supabase CRM
     const response = await recordBookingInSupabase({
       client_name: fullName,
@@ -195,14 +198,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       service_title: currentService.title,
       city: city,
       pin_code: pinCode,
-      booking_date: date,
+      booking_date: fullDateTime,
       hours: hours,
       total_price: totalPrice,
       companion_name: initialContext?.companionName || undefined,
       companion_avatar: initialContext?.companionAvatar || undefined,
       concierge_notes: initialContext?.companionName 
-        ? `Direct booking with companion ${initialContext.companionName}` 
-        : 'Direct web portal booking',
+        ? `Direct booking with companion ${initialContext.companionName} scheduled for ${fullDateTime}` 
+        : `Direct web portal booking scheduled for ${fullDateTime}`,
     });
 
     setConfirmedBookingCode(response.booking_code);
@@ -397,8 +400,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 )}
               </div>
 
-              {/* Date & Duration */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Date, Time Slot & Duration (3-Column Layout) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label htmlFor="booking-date" className="block text-xs font-semibold text-[#1d1d1f] mb-1 font-sans">
                     Date
@@ -414,6 +417,27 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                       onChange={(e) => setDate(e.target.value)}
                       className="w-full bg-[#f5f5f7] border border-black/[0.06] rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
                     />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="booking-timeslot" className="block text-xs font-semibold text-[#1d1d1f] mb-1 font-sans">
+                    Time Slot
+                  </label>
+                  <div className="relative">
+                    <Clock className="w-4 h-4 text-[#86868b] absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+                    <select
+                      id="booking-timeslot"
+                      value={timeSlot}
+                      onChange={(e) => setTimeSlot(e.target.value)}
+                      className="w-full bg-[#f5f5f7] border border-black/[0.06] rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+                    >
+                      <option value="11:00 AM">11:00 AM (Morning)</option>
+                      <option value="01:00 PM">01:00 PM (Lunch)</option>
+                      <option value="03:30 PM">03:30 PM (Afternoon)</option>
+                      <option value="06:00 PM">06:00 PM (Evening)</option>
+                      <option value="07:30 PM">07:30 PM (Prime)</option>
+                      <option value="09:00 PM">09:00 PM (Dinner & Night)</option>
+                    </select>
                   </div>
                 </div>
                 <div>

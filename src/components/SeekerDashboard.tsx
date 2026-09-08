@@ -17,13 +17,17 @@ import {
   Calendar,
   ShoppingBag,
   Receipt,
-  ArrowRight
+  ArrowRight,
+  Sparkles,
+  Clock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { fetchCompanionsFromSupabase, recordBookingInSupabase } from '../services/supabase';
 import { MyBookingsModal } from './MyBookingsModal';
 import { TransactionsModal } from './TransactionsModal';
 import { ThreeMonthPassModal } from './ThreeMonthPassModal';
+import { LegalPolicyModal } from './LegalPolicyModal';
+import { UpcomingEventsModal, EventItem } from './UpcomingEventsModal';
 
 interface SeekerDashboardProps {
   userName: string;
@@ -178,10 +182,24 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
 
   // POPUP CONFIRMATION STATES (Requested by user)
   const [confirmingCompanion, setConfirmingCompanion] = useState<CompanionProfile | null>(null);
-  const [bookingSuccessData, setBookingSuccessData] = useState<{ companion: CompanionProfile; bookingCode: string; serviceTitle: string } | null>(null);
+  const [bookingSuccessData, setBookingSuccessData] = useState<{ companion: CompanionProfile; bookingCode: string; serviceTitle: string; dateTime: string } | null>(null);
   const [bookingsModal, setBookingsModal] = useState(false);
   const [transactionsModal, setTransactionsModal] = useState(false);
   const [threeMonthPassModal, setThreeMonthPassModal] = useState(false);
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalTab, setLegalTab] = useState<'privacy' | 'refund' | 'terms'>('privacy');
+  const [eventsModalOpen, setEventsModalOpen] = useState(false);
+  const [deleteAccountModal, setDeleteAccountModal] = useState(false);
+
+  // Booking Date & Time selection states (Requested by user)
+  const [bookingDate, setBookingDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [bookingTimeSlot, setBookingTimeSlot] = useState('06:00 PM');
+  const [customTime, setCustomTime] = useState('');
+  const [bookingHours, setBookingHours] = useState(4);
 
   const [companions, setCompanions] = useState<CompanionProfile[]>(MOCK_COMPANIONS);
   const [_loadingCompanions, setLoadingCompanions] = useState(false);
@@ -262,6 +280,8 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
     setConfirmingCompanion(null);
 
     const bookingCode = `CK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const selectedTime = customTime.trim() || bookingTimeSlot;
+    const fullDateTime = `${bookingDate} at ${selectedTime}`;
 
     // 1. Ingest booking directly to Supabase bookings table
     try {
@@ -273,12 +293,12 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
         service_title: targetCredit.displayTitle || targetCredit.serviceName,
         city: comp.city,
         pin_code: comp.pinCode,
-        booking_date: new Date().toISOString().split('T')[0],
-        hours: 4,
+        booking_date: fullDateTime,
+        hours: bookingHours,
         total_price: targetCredit.priceNum || 1770,
         companion_name: comp.name,
         companion_avatar: comp.avatarUrl,
-        concierge_notes: `Booking Code: ${bookingCode}`,
+        concierge_notes: `Booking Code: ${bookingCode} | Scheduled: ${fullDateTime} (${bookingHours} Hours)`,
       });
     } catch (err) {
       console.warn('[SeekerDashboard] Record booking Supabase notice:', err);
@@ -294,6 +314,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
       companion: comp,
       bookingCode,
       serviceTitle: targetCredit.displayTitle || targetCredit.serviceName,
+      dateTime: fullDateTime,
     });
   };
 
@@ -404,6 +425,18 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
                       <span>Buy Services</span>
                     </button>
 
+                    {/* Upcoming Events */}
+                    <button
+                      onClick={() => {
+                        setShowSettingsMenu(false);
+                        setEventsModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-[#FF2D55] hover:bg-pink-50/80 transition text-left cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4 text-[#FF2D55]" />
+                      <span>Upcoming Events</span>
+                    </button>
+
                     <button
                       onClick={() => {
                         setShowSettingsMenu(false);
@@ -415,14 +448,42 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
                       <span>Transactions</span>
                     </button>
 
+                    {/* Privacy Policy */}
                     <button
                       onClick={() => {
                         setShowSettingsMenu(false);
+                        setLegalTab('privacy');
+                        setLegalModalOpen(true);
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-[#374151] hover:bg-pink-50/80 hover:text-[#FF2D55] transition text-left cursor-pointer"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-[#374151] hover:bg-pink-50/80 hover:text-[#0071E3] transition text-left cursor-pointer"
                     >
-                      <Settings className="w-4 h-4 text-[#6B7280]" />
-                      <span>Account Settings</span>
+                      <Settings className="w-4 h-4 text-[#0071E3]" />
+                      <span>Privacy Policy (IT Act)</span>
+                    </button>
+
+                    {/* Refund Policy */}
+                    <button
+                      onClick={() => {
+                        setShowSettingsMenu(false);
+                        setLegalTab('refund');
+                        setLegalModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-[#374151] hover:bg-pink-50/80 hover:text-emerald-700 transition text-left cursor-pointer"
+                    >
+                      <Receipt className="w-4 h-4 text-emerald-600" />
+                      <span>Refund Policy (100%)</span>
+                    </button>
+
+                    {/* Delete Account */}
+                    <button
+                      onClick={() => {
+                        setShowSettingsMenu(false);
+                        setDeleteAccountModal(true);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition text-left cursor-pointer"
+                    >
+                      <LogOut className="w-4 h-4 text-rose-500" />
+                      <span>Delete Account</span>
                     </button>
                   </div>
 
@@ -633,23 +694,21 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
 
       </main>
 
-      {/* POPUP 1: CONFIRM THE BOOKING? YES / NO (Requested specifically by user) */}
+      {/* POPUP 1: CONFIRM THE BOOKING? YES / NO (Includes Booking Date and Time Selection) */}
       {confirmingCompanion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border border-stone-200 shadow-[0_25px_70px_rgba(0,0,0,0.18)] space-y-6">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-stone-200 shadow-[0_25px_70px_rgba(0,0,0,0.22)] space-y-5 max-h-[90vh] overflow-y-auto no-scrollbar">
             
             {/* Header */}
             <div className="text-center space-y-1">
-              <div className="w-12 h-12 rounded-full bg-pink-50 text-[#FF2D55] flex items-center justify-center mx-auto mb-2">
+              <div className="w-12 h-12 rounded-full bg-pink-50 text-[#FF2D55] flex items-center justify-center mx-auto mb-2 shadow-xs">
                 <Heart className="w-6 h-6 fill-[#FF2D55]" />
               </div>
-              <h3 className="font-display font-black text-xl text-[#111827]">
-                Confirm the booking?
+              <h3 className="font-display font-black text-xl sm:text-2xl text-[#111827]">
+                Confirm Companion Booking
               </h3>
               <p className="text-xs text-[#6B7280]">
-                {Boolean(activeCredit) || (availableCredits && availableCredits.length > 0)
-                  ? 'Do you want to confirm this companion booking using your service credit?'
-                  : 'You have 0 active service credits. Please recharge your wallet to book this companion.'}
+                Choose your preferred meeting date, time slot, and duration
               </p>
             </div>
 
@@ -679,9 +738,83 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
               </div>
             </div>
 
+            {/* BOOKING DATE & TIME SELECTION SECTION */}
+            {Boolean(activeCredit) || (availableCredits && availableCredits.length > 0) ? (
+              <div className="space-y-3.5 text-left bg-stone-50 p-4 rounded-2xl border border-stone-200/70">
+                
+                {/* 1. Date Picker */}
+                <div>
+                  <label className="block text-xs font-bold text-[#111827] mb-1 font-sans flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#FF2D55]" />
+                    <span>Select Booking Date</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={new Date().toISOString().split('T')[0]}
+                    value={bookingDate}
+                    onChange={(e) => setBookingDate(e.target.value)}
+                    className="w-full bg-white border border-stone-300 rounded-xl px-3.5 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#FF2D55]"
+                  />
+                </div>
+
+                {/* 2. Time Slot Selector */}
+                <div>
+                  <label className="block text-xs font-bold text-[#111827] mb-1.5 font-sans flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#0071E3]" />
+                    <span>Select Time Slot</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    {['11:00 AM', '02:00 PM', '04:30 PM', '06:00 PM', '08:00 PM', '09:30 PM'].map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => { setBookingTimeSlot(slot); setCustomTime(''); }}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                          bookingTimeSlot === slot && !customTime
+                            ? 'bg-[#111827] text-white border-[#111827] shadow-xs'
+                            : 'bg-white text-stone-700 border-stone-200 hover:border-pink-300'
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Or Custom Time input */}
+                  <input
+                    type="text"
+                    placeholder="Or enter custom time (e.g. 05:45 PM)"
+                    value={customTime}
+                    onChange={(e) => setCustomTime(e.target.value)}
+                    className="w-full bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-medium placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#FF2D55]"
+                  />
+                </div>
+
+                {/* 3. Duration Selector */}
+                <div>
+                  <label className="block text-xs font-bold text-[#111827] mb-1 font-sans">
+                    Session Duration
+                  </label>
+                  <select
+                    value={bookingHours}
+                    onChange={(e) => setBookingHours(Number(e.target.value))}
+                    className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#FF2D55]"
+                  >
+                    <option value={1}>1 Hour Session (Cafe / Quick Dialogue)</option>
+                    <option value={2}>2 Hours Session (Lunch / Dinner)</option>
+                    <option value={4}>4 Hours Session (Movie / Hangout Package)</option>
+                    <option value={6}>6 Hours Session (Clubbing / Nightlife)</option>
+                    <option value={12}>12 Hours Session (Full Day City Tour)</option>
+                  </select>
+                </div>
+
+              </div>
+            ) : null}
+
             {/* YES / NO BUTTONS */}
             {Boolean(activeCredit) || (availableCredits && availableCredits.length > 0) ? (
-              <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="grid grid-cols-2 gap-3 pt-1">
                 <button
                   type="button"
                   onClick={() => setConfirmingCompanion(null)}
@@ -753,6 +886,10 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
               <div className="flex justify-between">
                 <span className="text-stone-500">Service:</span>
                 <span className="font-bold text-[#111827]">{bookingSuccessData.serviceTitle}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500">Scheduled Date &amp; Time:</span>
+                <span className="font-bold text-[#111827]">{bookingSuccessData.dateTime}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-500">Companion:</span>
@@ -875,6 +1012,65 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
         onFindCompanion={() => setThreeMonthPassModal(false)}
         userName={userName}
       />
+
+      {/* 4. LEGAL & PRIVACY POLICY MODAL (IT Act, 2000 & IT Rules 2011) */}
+      <LegalPolicyModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialTab={legalTab}
+      />
+
+      {/* 5. UPCOMING EVENTS MODAL */}
+      <UpcomingEventsModal
+        isOpen={eventsModalOpen}
+        onClose={() => setEventsModalOpen(false)}
+        onBookEventPartner={(evt: EventItem) => {
+          setEventsModalOpen(false);
+          setFilterService(evt.category === 'Concert & Music' ? 'Hangout' : 'All Services');
+        }}
+      />
+
+      {/* 6. DELETE ACCOUNT CONFIRMATION MODAL */}
+      {deleteAccountModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border border-rose-200 shadow-apple-float space-y-4">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <LogOut className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="font-display font-bold text-lg text-rose-950">
+                Permanently Delete Account?
+              </h3>
+              <p className="text-xs text-stone-600">
+                In compliance with <strong>Section 7 of our IT Act Data Retention policy</strong> for Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD), your profile and bookings will be scheduled for permanent erasure within 90 days.
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+              ⚠️ All active service credits and verified badges will be immediately revoked.
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteAccountModal(false)}
+                className="w-full py-2.5 rounded-xl border border-stone-300 text-stone-700 font-bold text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.clear();
+                  setDeleteAccountModal(false);
+                  if (onLogout) onLogout();
+                }}
+                className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm"
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

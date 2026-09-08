@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowUp, ShieldCheck, Heart } from 'lucide-react';
+import { LegalPolicyModal } from './LegalPolicyModal';
 
 interface FooterProps {
   onOpenBooking: () => void;
@@ -8,6 +9,8 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin }) => {
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalTab, setLegalTab] = useState<'privacy' | 'refund' | 'terms'>('privacy');
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,6 +24,11 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const openLegal = (tab: 'privacy' | 'refund' | 'terms') => {
+    setLegalTab(tab);
+    setLegalModalOpen(true);
+  };
+
   return (
     <>
       <footer className="bg-white/60 backdrop-blur-xl text-[#86868b] py-16 text-xs border-t border-pink-200/50 relative z-10">
@@ -29,7 +37,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
           {/* Top Legal Disclaimer */}
           <div className="pb-8 mb-8 border-b border-pink-200/50 text-[11px] leading-relaxed text-[#1d1d1f]/70">
             <p className="mb-2">
-              * Click Karo Date Karo is strictly a professional social companionship, lifestyle support, and daily care platform. All interactions strictly follow our consent-first rules and professional code of conduct. We do not provide dating, matrimonial, or adult escort services.
+              * Click Karo Date Karo is strictly a professional social companionship, lifestyle support, and daily care platform operated by <strong>Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD)</strong>. All interactions strictly follow our consent-first rules and professional code of conduct under the Information Technology Act, 2000. We do not provide dating, matrimonial, or adult escort services.
             </p>
             <p>
               ** Earnings calculations are estimates based on standard partner hourly rates and weekly active bookings. Individual earnings may vary based on city, availability, and client reviews.
@@ -78,31 +86,36 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
               <a href="#cities" className="hover:text-[#0071e3] transition">Pin Code Checker</a>
               <a href="#earnings" className="hover:text-[#0071e3] transition">Earnings Calculator</a>
               <a href="#pricing" className="hover:text-[#0071e3] transition">Membership Plans</a>
-              <button onClick={onOpenBooking} className="hover:text-[#0071e3] transition text-left text-xs">Find a Companion</button>
-              <button onClick={onOpenPartnerJoin} className="hover:text-[#0071e3] transition text-left text-xs text-[#0071e3] font-semibold">Become a Companion</button>
+              <button onClick={onOpenBooking} className="hover:text-[#0071e3] transition text-left text-xs cursor-pointer">Find a Companion</button>
+              <button onClick={onOpenPartnerJoin} className="hover:text-[#0071e3] transition text-left text-xs text-[#0071e3] font-semibold cursor-pointer">Become a Companion</button>
             </div>
 
-            {/* Company */}
+            {/* Company & Legal Policies */}
             <div className="flex flex-col gap-2.5">
               <h4 className="text-[#1d1d1f] font-bold text-xs tracking-tight">
-                Company
+                Company &amp; Legal
               </h4>
-              <a href="#faq" className="hover:text-[#0071e3] transition">About Us</a>
-              <a href="#faq" className="hover:text-[#0071e3] transition">Code of Conduct</a>
-              <a href="#faq" className="hover:text-[#0071e3] transition">Privacy Policy</a>
-              <a href="#faq" className="hover:text-[#0071e3] transition">Terms of Service</a>
-              <a href="#faq" className="hover:text-[#0071e3] transition">Refund Policy</a>
+              <a href="#trust-blueprint" className="hover:text-[#0071e3] transition">About Us</a>
+              <button onClick={() => openLegal('privacy')} className="hover:text-[#0071e3] transition text-left text-xs cursor-pointer">
+                Privacy Policy (IT Act, 2000)
+              </button>
+              <button onClick={() => openLegal('terms')} className="hover:text-[#0071e3] transition text-left text-xs cursor-pointer">
+                Terms of Service
+              </button>
+              <button onClick={() => openLegal('refund')} className="hover:text-[#0071e3] transition text-left text-xs cursor-pointer text-emerald-700 font-semibold">
+                100% Refund Policy
+              </button>
             </div>
 
             {/* Support */}
             <div className="flex flex-col gap-2.5">
               <h4 className="text-[#1d1d1f] font-bold text-xs tracking-tight">
-                Support
+                Support &amp; Grievance
               </h4>
               <a href="#faq" className="hover:text-[#0071e3] transition">Help Center</a>
               <a href="#faq" className="hover:text-[#0071e3] transition">24/7 Safety SOS</a>
-              <a href="#faq" className="hover:text-[#0071e3] transition">Face Verification</a>
-              <span className="text-[11px] text-[#86868b] mt-1">support@clickkarodatekaro.in</span>
+              <span className="text-[11px] text-[#86868b] mt-1">grievance@kopartner.in</span>
+              <span className="text-[11px] text-[#86868b]">dpo@kopartner.in</span>
             </div>
 
           </div>
@@ -110,7 +123,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
           {/* Bottom Copyright */}
           <div className="mt-12 pt-6 border-t border-pink-200/50 flex flex-col md:flex-row justify-between items-center gap-3 text-[11px] text-[#86868b]">
             <div>
-              Copyright &copy; 2025 Click Karo Date Karo. All rights reserved.
+              Copyright &copy; 2025 Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD). All rights reserved.
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
@@ -136,6 +149,14 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
       >
         <ArrowUp className="w-4 h-4" />
       </button>
+
+      {/* Legal & Policy Modal (IT Act 2000, 100% Refund, Terms) */}
+      <LegalPolicyModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialTab={legalTab}
+      />
     </>
   );
 };
+
