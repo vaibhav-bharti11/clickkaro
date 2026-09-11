@@ -87,13 +87,25 @@ export const MyBookingsModal: React.FC<MyBookingsModalProps> = ({
     city: b.city || 'Delhi NCR',
     location: `${b.city || 'Premier Venue'} (PIN: ${b.pin_code || '110001'})`,
     pinCode: b.pin_code || '110001',
-    status: b.status === 'confirmed' ? 'Confirmed & Scheduled' : 'Pending Companion Confirmation',
-    isConfirmed: b.status === 'confirmed',
+    status: b.status === 'confirmed'
+      ? 'Confirmed & Scheduled'
+      : b.status === 'in_progress'
+      ? 'Date in Progress (Companion Offline)'
+      : b.status === 'completed'
+      ? 'Completed & Paid'
+      : b.status === 'cancelled'
+      ? 'Auto-Cancelled (Credit Refunded)'
+      : 'Pending Companion Confirmation',
+    rawStatus: b.status,
+    isConfirmed: b.status === 'confirmed' || b.status === 'in_progress' || b.status === 'completed',
+    isCancelled: b.status === 'cancelled',
+    isInProgress: b.status === 'in_progress',
     amount: b.total_price ? `₹${Number(b.total_price).toLocaleString('en-IN')}.00` : '₹1,770.00',
-    companionPhone: b.status === 'confirmed' ? '+91 97193 33339' : 'Unlocked upon confirmation',
+    companionPhone: (b.status === 'confirmed' || b.status === 'in_progress') ? '+91 97193 33339' : (b.status === 'cancelled' ? 'Cancelled' : 'Unlocked upon confirmation'),
     clientName: b.client_name,
     rating: '5.0 ★',
-    completionOtp: b.completion_otp || '4829',
+    startDateOtp: b.start_date_otp || b.metadata?.start_date_otp || '7391',
+    completionOtp: b.completion_otp || b.metadata?.completion_otp || '4829',
   }));
 
   // Convert any usedCredits into bookings format
@@ -108,11 +120,15 @@ export const MyBookingsModal: React.FC<MyBookingsModalProps> = ({
     location: 'Selected Premium Venue',
     pinCode: '110001',
     status: 'Booking Confirmed',
+    rawStatus: 'confirmed',
     isConfirmed: true,
+    isCancelled: false,
+    isInProgress: false,
     amount: c.price,
     companionPhone: '+91 97193 33339',
     clientName: userName || 'Seeker',
     rating: '5.0 ★',
+    startDateOtp: '7391',
     completionOtp: '4829',
   }));
 
@@ -260,32 +276,77 @@ export const MyBookingsModal: React.FC<MyBookingsModalProps> = ({
                   </div>
                 </div>
 
-                {/* Outing Completion OTP & Escrow Protection */}
-                <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <div className="flex items-start sm:items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                      <KeyRound className="w-4 h-4" />
-                    </div>
+                {/* Auto-cancelled refund notice banner */}
+                {b.isCancelled && (
+                  <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs flex items-start gap-2.5">
+                    <span className="text-base">⚠️</span>
                     <div>
-                      <div className="font-bold text-amber-900 flex items-center gap-1.5">
-                        <span>Outing Completion OTP</span>
-                        <span className="text-[10px] bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full font-semibold">
-                          Escrow Protected
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-amber-700 leading-tight mt-0.5">
-                        Share this 4-digit code with your companion ONLY after the meeting finishes to release their payout.
+                      <div className="font-bold text-rose-800">Booking Auto-Cancelled & Credit Refunded</div>
+                      <p className="text-[11px] text-rose-700 leading-tight mt-0.5">
+                        The companion did not confirm the booking at least 2 hours before the scheduled outing. 1 Service Credit has been automatically refunded to your account wallet.
                       </p>
                     </div>
                   </div>
+                )}
 
-                  <div className="text-center sm:text-right shrink-0 bg-white sm:bg-transparent p-2 sm:p-0 rounded-xl border sm:border-0 border-amber-200">
-                    <span className="text-[10px] uppercase font-bold text-amber-800 block">Your Secret OTP</span>
-                    <span className="font-mono font-black text-lg text-amber-900 tracking-widest bg-amber-100/70 px-3 py-1 rounded-xl border border-amber-300 inline-block mt-0.5">
-                      {b.completionOtp || '4829'}
-                    </span>
+                {/* Both OTPs for Active Outings */}
+                {!b.isCancelled && (
+                  <div className="space-y-2.5">
+                    {/* 1. Start Date OTP */}
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-rose-50 to-pink-50 border border-pink-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-start sm:items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-pink-100 text-[#FF2D55] flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                          <KeyRound className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-pink-950 flex items-center gap-1.5">
+                            <span>Start Date OTP</span>
+                            <span className="text-[10px] bg-pink-200/80 text-pink-900 px-2 py-0.5 rounded-full font-semibold">
+                              Give at Meetup Start
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-pink-800 leading-tight mt-0.5">
+                            Share this 4-digit code with your companion when meeting up to begin your date. (Their profile will automatically go offline for the booked duration).
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-center sm:text-right shrink-0 bg-white sm:bg-transparent p-2 sm:p-0 rounded-xl border sm:border-0 border-pink-200">
+                        <span className="text-[10px] uppercase font-bold text-pink-800 block">Start OTP</span>
+                        <span className="font-mono font-black text-lg text-[#FF2D55] tracking-widest bg-pink-100/80 px-3 py-1 rounded-xl border border-pink-300 inline-block mt-0.5">
+                          {b.startDateOtp || '7391'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 2. Outing Completion OTP & Escrow Protection */}
+                    <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-start sm:items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                          <ShieldCheck className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                            <span>Outing Completion OTP</span>
+                            <span className="text-[10px] bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full font-semibold">
+                              Escrow Protected
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-amber-700 leading-tight mt-0.5">
+                            Share this 4-digit code with your companion ONLY after the meeting finishes to release their payout.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-center sm:text-right shrink-0 bg-white sm:bg-transparent p-2 sm:p-0 rounded-xl border sm:border-0 border-amber-200">
+                        <span className="text-[10px] uppercase font-bold text-amber-800 block">Completion OTP</span>
+                        <span className="font-mono font-black text-lg text-amber-900 tracking-widest bg-amber-100/70 px-3 py-1 rounded-xl border border-amber-300 inline-block mt-0.5">
+                          {b.completionOtp || '4829'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Direct call banner */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-1 text-xs">

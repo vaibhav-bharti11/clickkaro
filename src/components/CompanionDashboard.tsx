@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BookingRequest, CompanionProfile } from '../types';
-import { TrendingUp, CheckCircle2, XCircle, Clock, ShieldCheck, ArrowLeft, Sparkles, MapPin, DollarSign, Calendar, AlertTriangle, LogOut, Camera, Plus, Trash2, Image as ImageIcon, UserCheck, Bell, ShieldAlert, Mail, KeyRound, Lock, Eye, Edit3 } from 'lucide-react';
+import { TrendingUp, CheckCircle2, XCircle, Clock, ShieldCheck, ArrowLeft, Sparkles, MapPin, DollarSign, Calendar, AlertTriangle, LogOut, Camera, Plus, Trash2, Image as ImageIcon, UserCheck, Bell, ShieldAlert, Mail, KeyRound, Lock, Eye, Edit3, Play } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { fetchCompanionRequestsFromSupabase, updateBookingStatusInSupabase, updateUserAvatarInSupabase, sendBookingConfirmationEmail, verifyCompletionOtpAndReleasePayout, updateCompanionProfileInSupabase } from '../services/supabase';
+import { fetchCompanionRequestsFromSupabase, updateBookingStatusInSupabase, updateUserAvatarInSupabase, sendBookingConfirmationEmail, verifyCompletionOtpAndReleasePayout, updateCompanionProfileInSupabase, verifyStartDateOtpAndSetCompanionOffline, checkAndRestoreCompanionOnlineStatus } from '../services/supabase';
 import { SeekerProfileModal } from './SeekerProfileModal';
 import { FaceVerificationModal } from './FaceVerificationModal';
 import { CompanionProfileView } from './CompanionProfileView';
@@ -164,6 +164,13 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
   const [otpError, setOtpError] = useState<string | null>(null);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
+  // Start Date OTP Modal state (giving seeker OTP to companion at start, setting companion offline)
+  const [startDateModalBooking, setStartDateModalBooking] = useState<BookingRequest | null>(null);
+  const [enteredStartOtp, setEnteredStartOtp] = useState('');
+  const [startOtpError, setStartOtpError] = useState<string | null>(null);
+  const [isVerifyingStartOtp, setIsVerifyingStartOtp] = useState(false);
+  const [dateCountdownMsg, setDateCountdownMsg] = useState<string | null>(null);
+
   // Gallery state for portfolio photos
   const [gallery, setGallery] = useState<string[]>(() => {
     try {
@@ -246,11 +253,14 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
           netPayout: Math.round(Number(b.total_price) * 0.8),
           status: (b.status === 'completed'
             ? 'completed'
-            : (b.status === 'confirmed' || b.status === 'ongoing' || b.status === 'in_progress')
+            : b.status === 'in_progress'
+            ? 'in_progress'
+            : (b.status === 'confirmed' || b.status === 'ongoing')
             ? 'ongoing'
             : b.status === 'cancelled'
             ? 'declined'
             : 'pending') as any,
+          startDateOtp: b.start_date_otp || b.metadata?.start_date_otp,
           completionOtp: b.completion_otp,
           payoutReleased: b.payout_released,
           createdAt: new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -279,11 +289,35 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
     const interval = setInterval(() => {
       loadRequests();
     }, 15000);
-    return () => clearInterval(interval);
+
+    // Live monitor for companion offline status during active date
+    const statusCheckInterval = setInterval(async () => {
+      if (!userName) return;
+      const status = await checkAndRestoreCompanionOnlineStatus(userName);
+      if (status.restored) {
+        setIsOnline(true);
+        setDateCountdownMsg(null);
+      } else if (status.isOnline === false) {
+        setIsOnline(false);
+        if (status.remainingMs) {
+          const totalMins = Math.ceil(status.remainingMs / 60000);
+          const hrs = Math.floor(totalMins / 60);
+          const mins = totalMins % 60;
+          setDateCountdownMsg(`You are currently on an active date. Your profile is OFFLINE in the database (${hrs > 0 ? `${hrs}h ` : ''}${mins}m remaining).`);
+        }
+      } else {
+        setDateCountdownMsg(null);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(statusCheckInterval);
+    };
   }, [userName]);
 
   const pendingRequests = requests.filter((r) => r.status === 'pending');
-  const ongoingBookings = requests.filter((r) => r.status === 'ongoing' || r.status === 'accepted');
+  const ongoingBookings = requests.filter((r) => r.status === 'ongoing' || r.status === 'accepted' || r.status === 'in_progress');
   const completedBookings = requests.filter((r) => r.status === 'completed');
 
   // Real client earnings: released to companion account upon OTP verification
@@ -332,6 +366,46 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
     });
   };
 
+  const handleStartMeetupWithOtp = async () => {
+    if (!startDateModalBooking || !enteredStartOtp.trim()) return;
+    setIsVerifyingStartOtp(true);
+    setStartOtpError(null);
+
+    try {
+      const bCode = (startDateModalBooking as any).bookingCode || startDateModalBooking.id;
+      const res = await verifyStartDateOtpAndSetCompanionOffline(
+        bCode,
+        enteredStartOtp.trim(),
+        userName
+      );
+
+      if (res.success) {
+        setIsOnline(false);
+        setRequests((prev) =>
+          prev.map((r) =>
+            r.id === startDateModalBooking.id ? { ...r, status: 'in_progress' as any } : r
+          )
+        );
+        const hours = res.hours || startDateModalBooking.hours || 4;
+        setDateCountdownMsg(`You are currently on an active date with ${startDateModalBooking.seekerName}. Profile is OFFLINE in database (${hours}h remaining).`);
+        setStartDateModalBooking(null);
+        setEnteredStartOtp('');
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.5 },
+        });
+        alert(`❤️ Date Started Successfully!\n\n${res.message}\n\nYour profile is now OFFLINE in the database for the next ${hours} hours to prevent double-booking. When your date finishes, enter the customer's Completion OTP to release your escrow payout.`);
+      } else {
+        setStartOtpError(res.message);
+      }
+    } catch (err: any) {
+      setStartOtpError(err.message || 'Start OTP verification failed');
+    } finally {
+      setIsVerifyingStartOtp(false);
+    }
+  };
+
   const handleVerifyOtp = async () => {
     if (!otpModalBooking || !enteredOtp.trim()) return;
     setIsVerifyingOtp(true);
@@ -344,6 +418,11 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
       );
 
       if (res.success) {
+        setIsOnline(true);
+        setDateCountdownMsg(null);
+        localStorage.removeItem(`ck_companion_offline_until_${userName}`);
+        localStorage.removeItem('ck_active_date_booking');
+
         setRequests((prev) =>
           prev.map((r) =>
             r.id === otpModalBooking.id ? { ...r, status: 'completed' as const, payoutReleased: true } : r
@@ -357,7 +436,7 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
           spread: 80,
           origin: { y: 0.5 },
         });
-        alert(`🎉 Outing Completed & Verified!\n\n₹${payout.toLocaleString('en-IN')} held in escrow has been successfully released to your account.`);
+        alert(`🎉 Outing Completed & Verified!\n\n₹${payout.toLocaleString('en-IN')} held in escrow has been successfully released to your account. Your companion profile is now back ONLINE.`);
       } else {
         setOtpError(res.message);
       }
@@ -1144,19 +1223,37 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
 
         </div>
 
+        {/* ACTIVE DATE OFFLINE STATUS BANNER */}
+        {dateCountdownMsg && (
+          <div className="mb-6 p-4.5 rounded-3xl bg-gradient-to-r from-rose-500 via-pink-600 to-purple-600 text-white shadow-apple-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5 text-white animate-spin" />
+              </div>
+              <div>
+                <div className="font-bold text-sm sm:text-base">Date in Progress &bull; Profile is OFFLINE</div>
+                <p className="text-xs text-white/90">{dateCountdownMsg}</p>
+              </div>
+            </div>
+            <span className="text-[11px] font-bold uppercase tracking-wider bg-white text-rose-600 px-3.5 py-1.5 rounded-full shadow-xs shrink-0 self-end sm:self-auto">
+              Offline Protected
+            </span>
+          </div>
+        )}
+
         {/* 3. ONGOING OUTINGS & ESCROW HELD */}
         {ongoingBookings.length > 0 && (
           <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border border-amber-200/80 shadow-apple-md mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-amber-100">
               <div>
                 <h2 className="text-xl font-bold text-[#1d1d1f] flex items-center gap-2">
-                  <span>Ongoing Outings (Escrow Held)</span>
+                  <span>Ongoing &amp; Scheduled Outings</span>
                   <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
                     {ongoingBookings.length} Active
                   </span>
                 </h2>
                 <p className="text-xs text-[#86868b] mt-0.5">
-                  Meetups in progress. Ask the customer for the 4-digit OTP sent to their email to release your payout.
+                  Meetups in progress or scheduled. Verify customer's Start OTP to start your date and set profile offline.
                 </p>
               </div>
               <div className="text-right">
@@ -1171,25 +1268,36 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
               {ongoingBookings.map((b) => (
                 <div
                   key={b.id}
-                  className="p-5 rounded-2xl bg-amber-50/50 border border-amber-200/90 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs shadow-xs"
+                  className={`p-5 rounded-2xl border transition shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs ${
+                    b.status === 'in_progress'
+                      ? 'bg-rose-50/60 border-rose-200 ring-2 ring-rose-300/40'
+                      : 'bg-amber-50/50 border-amber-200/90'
+                  }`}
                 >
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 font-bold text-[#1d1d1f]">
                       <span className="text-sm">{b.seekerName}</span>
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-200">
-                        <Lock className="w-3 h-3 text-amber-700" />
-                        <span>Payment in Escrow</span>
-                      </span>
+                      {b.status === 'in_progress' ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-800 bg-rose-100 px-2.5 py-0.5 rounded-full border border-rose-200 animate-pulse">
+                          <span className="w-2 h-2 rounded-full bg-rose-600"></span>
+                          <span>Date in Progress (Profile Offline)</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-200">
+                          <Lock className="w-3 h-3 text-amber-700" />
+                          <span>Escrow Held &bull; Ready to Start</span>
+                        </span>
+                      )}
                     </div>
                     <div className="text-[#86868b]">
-                      {b.serviceTitle} &bull; {b.date} &bull; {b.location}
+                      {b.serviceTitle} &bull; {b.date} &bull; {b.location} &bull; <strong>{b.hours} Hours</strong>
                     </div>
                     <div className="text-[11px] text-stone-600">
                       Client Contact: <strong className="font-mono text-[#111827]">{b.seekerPhone}</strong>
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-amber-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-stone-200">
                     <div className="text-right sm:text-right pr-2">
                       <div className="text-[10px] text-[#86868b] uppercase font-bold">Your Net Payout</div>
                       <div className="font-bold text-emerald-700 text-base">
@@ -1197,18 +1305,33 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOtpModalBooking(b);
-                        setEnteredOtp('');
-                        setOtpError(null);
-                      }}
-                      className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition shadow-sm text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                    >
-                      <KeyRound className="w-4 h-4" />
-                      <span>Complete Meetup &amp; Enter OTP</span>
-                    </button>
+                    {b.status === 'in_progress' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOtpModalBooking(b);
+                          setEnteredOtp('');
+                          setOtpError(null);
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-sm text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                      >
+                        <KeyRound className="w-4 h-4" />
+                        <span>Complete Date &amp; Enter OTP</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStartDateModalBooking(b);
+                          setEnteredStartOtp('');
+                          setStartOtpError(null);
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#FF2D55] to-[#E11D48] hover:opacity-95 text-white font-bold transition shadow-sm text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                      >
+                        <Play className="w-4 h-4 fill-white" />
+                        <span>Start Date (Enter Start OTP)</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1342,6 +1465,107 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
                     setOtpModalBooking(null);
                     setEnteredOtp('');
                     setOtpError(null);
+                  }}
+                  className="px-4 py-3 rounded-2xl bg-stone-100 hover:bg-stone-200 text-[#111827] font-bold text-xs transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* START DATE OTP VERIFICATION MODAL (SETS COMPANION PROFILE OFFLINE FOR BOOKING DURATION) */}
+        {startDateModalBooking && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border border-pink-200 shadow-[0_25px_70px_rgba(0,0,0,0.18)] text-center space-y-4 relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setStartDateModalBooking(null);
+                  setEnteredStartOtp('');
+                  setStartOtpError(null);
+                }}
+                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 transition cursor-pointer"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+
+              <div className="w-16 h-16 rounded-full bg-pink-100 text-[#FF2D55] flex items-center justify-center mx-auto shadow-md">
+                <Play className="w-7 h-7 fill-[#FF2D55] ml-0.5" />
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="font-display font-black text-2xl text-[#111827]">
+                  Start Date &bull; Enter OTP
+                </h3>
+                <p className="text-xs text-[#6B7280]">
+                  Ask <strong className="text-[#111827]">{startDateModalBooking.seekerName}</strong> for their 4-digit <strong>Start Date OTP</strong> shown in their booking.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-pink-50/70 border border-pink-200 text-left space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-stone-600">Client / Seeker:</span>
+                  <span className="font-bold text-[#111827]">{startDateModalBooking.seekerName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-600">Service Outing:</span>
+                  <span className="font-medium text-[#111827]">{startDateModalBooking.serviceTitle}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-600">Booking Duration:</span>
+                  <span className="font-bold text-[#FF2D55]">{startDateModalBooking.hours} Hours</span>
+                </div>
+                <div className="pt-2 border-t border-pink-200/80 text-[11px] text-stone-600 leading-relaxed">
+                  🔒 <strong>Auto-Offline Protection:</strong> Upon verifying this OTP, your profile will automatically go <strong>OFFLINE</strong> in the database for {startDateModalBooking.hours} hours so no other seeker can book you during this date.
+                </div>
+              </div>
+
+              {/* Start Date OTP Input */}
+              <div className="space-y-2 text-left">
+                <label className="text-xs font-bold text-[#111827] block">
+                  Enter 4-Digit Start OTP
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={enteredStartOtp}
+                  onChange={(e) => {
+                    setEnteredStartOtp(e.target.value.replace(/\D/g, ''));
+                    setStartOtpError(null);
+                  }}
+                  placeholder="Enter 4-digit Start OTP"
+                  className="w-full text-center tracking-widest font-mono text-xl py-3 px-4 rounded-2xl border-2 border-stone-200 focus:border-[#FF2D55] outline-none transition font-bold"
+                  autoFocus
+                />
+                <p className="text-[11px] text-stone-500 text-center">
+                  The client has this code on their screen under "Start Date OTP".
+                </p>
+              </div>
+
+              {startOtpError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium text-left">
+                  {startOtpError}
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleStartMeetupWithOtp}
+                  disabled={enteredStartOtp.length < 4 || isVerifyingStartOtp}
+                  className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-[#FF2D55] to-[#E11D48] hover:opacity-95 disabled:opacity-50 text-white font-bold text-xs sm:text-sm transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>{isVerifyingStartOtp ? 'Starting Date...' : `Start Date (${startDateModalBooking.hours}h Offline)`}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDateModalBooking(null);
+                    setEnteredStartOtp('');
+                    setStartOtpError(null);
                   }}
                   className="px-4 py-3 rounded-2xl bg-stone-100 hover:bg-stone-200 text-[#111827] font-bold text-xs transition cursor-pointer"
                 >

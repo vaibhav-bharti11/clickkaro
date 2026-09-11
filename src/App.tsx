@@ -23,6 +23,7 @@ import { AboutUsPage } from './components/AboutUsPage';
 import { ServiceItem, UserRole, CompanionProfile, BookingContext, ServiceCredit } from './types';
 import { ALL_SERVICES } from './data/servicesData';
 import { subscribeToAuthChanges } from './services/firebase';
+import { autoCancelUnconfirmedBookingsAndRefundCredits } from './services/supabase';
 import { CmsProvider, useCms } from './context/CmsContext';
 import { AdminCmsModal } from './components/AdminCmsModal';
 
@@ -122,7 +123,28 @@ const AppContent: React.FC = () => {
       }
     });
 
-    return () => unsubscribe();
+    // Listen to real-time credit updates and auto-refund events
+    const handleCreditsUpdated = () => {
+      try {
+        const freshAvail = JSON.parse(localStorage.getItem('ck_credits') || '[]');
+        const freshUsed = JSON.parse(localStorage.getItem('ck_used_credits') || '[]');
+        setAvailableCredits(freshAvail);
+        setUsedCredits(freshUsed);
+      } catch (e) {}
+    };
+    window.addEventListener('ck_credits_updated', handleCreditsUpdated);
+
+    // Initial and periodic check for auto-cancelling unconfirmed bookings < 2 hours
+    autoCancelUnconfirmedBookingsAndRefundCredits().catch(() => {});
+    const autoCancelTimer = setInterval(() => {
+      autoCancelUnconfirmedBookingsAndRefundCredits().catch(() => {});
+    }, 30000);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('ck_credits_updated', handleCreditsUpdated);
+      clearInterval(autoCancelTimer);
+    };
   }, []);
 
   const handleOpenAuth = (mode: 'signin' | 'signup' = 'signin') => {

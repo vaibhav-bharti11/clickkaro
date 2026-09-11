@@ -117,7 +117,8 @@ export interface BookingRequest {
   pinCode: string;
   totalEarnings: number;
   netPayout: number;
-  status: 'pending' | 'accepted' | 'ongoing' | 'declined' | 'completed';
+  status: 'pending' | 'accepted' | 'ongoing' | 'in_progress' | 'declined' | 'completed';
+  startDateOtp?: string;
   completionOtp?: string;
   payoutReleased?: boolean;
   createdAt: string;

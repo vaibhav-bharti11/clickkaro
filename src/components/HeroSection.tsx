@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   ArrowRight, 
   ShieldCheck, 
-  Phone, 
-  MessageSquare, 
   UserCheck, 
   Heart, 
   Sparkles, 
@@ -43,7 +41,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const heroCms = content.hero;
 
   const [activeCompanionIdx, setActiveCompanionIdx] = useState(0);
-  const [callingState, setCallingState] = useState(false);
   const [internalSceneIdx, setInternalSceneIdx] = useState(0);
   const [profileList, setProfileList] = useState<CompanionProfile[]>(MOCK_COMPANIONS);
   const [isFading, setIsFading] = useState(false);
@@ -124,14 +121,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       if (onNavigateCompanion) onNavigateCompanion();
       else onOpenPartnerJoin();
     }
-  };
-
-  const handleTriggerCall = () => {
-    setCallingState(true);
-    setTimeout(() => {
-      setCallingState(false);
-      handleSeekerAction(currentCompanion);
-    }, 500);
   };
 
   return (
@@ -332,29 +321,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </div>
             </div>
 
-            {/* Action Triggers */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleTriggerCall();
-                }}
-                disabled={callingState}
-                className="bg-gradient-to-r from-[#FF2D55] via-[#E11D48] to-[#FF5E3A] hover:opacity-95 text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider px-4 sm:px-6 py-2.5 sm:py-3 rounded-full transition shadow-xs active:scale-95 flex items-center gap-1 shrink-0 apple-focus cursor-pointer"
-              >
-                <Phone className={`w-3 h-3 ${callingState ? 'animate-bounce' : ''}`} />
-                <span>{callingState ? 'Connecting...' : 'Connect'}</span>
-              </button>
-
+            {/* Action Trigger */}
+            <div className="flex items-center shrink-0">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handleSeekerAction(currentCompanion);
                 }}
-                aria-label="View companion profile"
-                className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-pink-50 hover:bg-pink-100 text-[#1d1d1f] flex items-center justify-center border border-pink-200 transition shrink-0 apple-focus active:scale-95 cursor-pointer"
+                className="bg-gradient-to-r from-[#FF2D55] via-[#E11D48] to-[#FF5E3A] hover:opacity-95 text-white text-xs sm:text-sm font-bold tracking-wide px-5 sm:px-7 py-2.5 sm:py-3 rounded-full transition shadow-md shadow-pink-500/25 active:scale-95 flex items-center justify-center shrink-0 apple-focus cursor-pointer"
               >
-                <MessageSquare className="w-4 h-4 text-[#0071e3]" />
+                <span>Book Now</span>
               </button>
             </div>
           </div>

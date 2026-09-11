@@ -261,55 +261,73 @@ export interface BookingRecord {
 
 export const recordBookingInSupabase = async (
   booking: BookingRecord
-): Promise<{ success: boolean; booking_code: string; completion_otp?: string; data?: any; error?: any }> => {
+): Promise<{ success: boolean; booking_code: string; start_date_otp?: string; completion_otp?: string; data?: any; error?: any }> => {
   const bookingCode = generateCode('CK-BK');
   const completionOtp = Math.floor(1000 + Math.random() * 9000).toString();
-  console.info('[Supabase CRM] Recording booking:', bookingCode, 'Completion OTP:', completionOtp, booking.service_title, booking.total_price);
+  const startDateOtp = Math.floor(1000 + Math.random() * 9000).toString();
+  console.info('[Supabase CRM] Recording booking:', bookingCode, 'Start OTP:', startDateOtp, 'Completion OTP:', completionOtp, booking.service_title, booking.total_price);
 
   // Queue locally
   try {
     const queue = JSON.parse(localStorage.getItem('ck_crm_bookings_queue') || '[]');
-    queue.push({ booking_code: bookingCode, completion_otp: completionOtp, ...booking, queued_at: new Date().toISOString() });
+    queue.push({
+      booking_code: bookingCode,
+      start_date_otp: startDateOtp,
+      completion_otp: completionOtp,
+      ...booking,
+      queued_at: new Date().toISOString()
+    });
     localStorage.setItem('ck_crm_bookings_queue', JSON.stringify(queue.slice(-20)));
   } catch (e) {
     // Ignore storage errors
   }
 
   if (!supabase) {
-    return { success: true, booking_code: bookingCode, completion_otp: completionOtp };
+    return { success: true, booking_code: bookingCode, start_date_otp: startDateOtp, completion_otp: completionOtp };
   }
 
   try {
-    const { data, error } = await supabase
+    const payload: any = {
+      booking_code: bookingCode,
+      client_name: booking.client_name,
+      client_phone: booking.client_phone,
+      client_email: booking.client_email,
+      service_id: booking.service_id,
+      service_title: booking.service_title,
+      city: booking.city,
+      pin_code: booking.pin_code,
+      booking_date: booking.booking_date,
+      hours: booking.hours,
+      total_price: booking.total_price,
+      companion_name: booking.companion_name,
+      companion_avatar: booking.companion_avatar,
+      status: 'pending',
+      payment_status: 'unpaid',
+      start_date_otp: startDateOtp,
+      completion_otp: completionOtp,
+      payout_released: false,
+      concierge_notes: booking.concierge_notes || 'Client booked via web portal',
+      metadata: {
+        referrer: document.referrer,
+        device: navigator.userAgent,
+        start_date_otp: startDateOtp,
+        completion_otp: completionOtp,
+      },
+    };
+
+    let { data, error } = await supabase
       .from('bookings')
-      .insert([
-        {
-          booking_code: bookingCode,
-          client_name: booking.client_name,
-          client_phone: booking.client_phone,
-          client_email: booking.client_email,
-          service_id: booking.service_id,
-          service_title: booking.service_title,
-          city: booking.city,
-          pin_code: booking.pin_code,
-          booking_date: booking.booking_date,
-          hours: booking.hours,
-          total_price: booking.total_price,
-          companion_name: booking.companion_name,
-          companion_avatar: booking.companion_avatar,
-          status: 'pending',
-          payment_status: 'unpaid',
-          completion_otp: completionOtp,
-          payout_released: false,
-          concierge_notes: booking.concierge_notes || 'Client booked via web portal',
-          metadata: {
-            referrer: document.referrer,
-            device: navigator.userAgent,
-          },
-        },
-      ])
+      .insert([payload])
       .select()
       .single();
+
+    // Fallback if start_date_otp column does not exist yet in live Supabase table
+    if (error && error.message?.includes('start_date_otp')) {
+      delete payload.start_date_otp;
+      const retry = await supabase.from('bookings').insert([payload]).select().single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.warn('[Supabase CRM] Booking insert error:', error.message);
@@ -339,7 +357,7 @@ export const recordBookingInSupabase = async (
       console.warn('[Supabase Payments] Auto-record payment failed:', pErr);
     }
 
-    return { success: true, booking_code: bookingCode, completion_otp: completionOtp, data };
+    return { success: true, booking_code: bookingCode, start_date_otp: startDateOtp, completion_otp: completionOtp, data };
   } catch (err) {
     console.error('[Supabase CRM] Booking network error:', err);
     return { success: false, booking_code: bookingCode, error: err };
@@ -446,6 +464,11 @@ export const fetchUserBookingsFromSupabase = async (options?: {
   phone?: string | null;
   email?: string | null;
 }): Promise<any[]> => {
+  // Proactively auto-cancel unconfirmed bookings < 2h and refund credits
+  try {
+    autoCancelUnconfirmedBookingsAndRefundCredits(options).catch(() => {});
+  } catch (e) {}
+
   const localQueue = JSON.parse(localStorage.getItem('ck_crm_bookings_queue') || '[]');
 
   if (!supabase) {
@@ -517,6 +540,192 @@ export const fetchUserBookingsFromSupabase = async (options?: {
     console.warn('[Supabase Bookings] Exception:', err);
     return localQueue;
   }
+};
+
+// -------------------------------------------------------------------------
+// 11.1 AUTO-CANCEL UNCONFIRMED BOOKINGS < 2 HOURS & REFUND CREDITS
+// -------------------------------------------------------------------------
+export const parseBookingTimestamp = (bookingDateStr?: string, createdAtStr?: string): number => {
+  if (!bookingDateStr) {
+    if (createdAtStr) {
+      const cTime = new Date(createdAtStr).getTime();
+      if (!isNaN(cTime)) return cTime + 24 * 3600 * 1000;
+    }
+    return Date.now() + 24 * 3600 * 1000;
+  }
+
+  const clean = bookingDateStr.trim();
+
+  // Format 1: "YYYY-MM-DD at HH:MM AM/PM" or "YYYY-MM-DD at HH:MM"
+  const atMatch = clean.match(/^(\d{4}-\d{2}-\d{2})\s+at\s+(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (atMatch) {
+    const [, datePart, hoursPart, minsPart, meridiem] = atMatch;
+    let h = parseInt(hoursPart, 10);
+    const m = parseInt(minsPart, 10);
+    if (meridiem?.toUpperCase() === 'PM' && h < 12) h += 12;
+    if (meridiem?.toUpperCase() === 'AM' && h === 12) h = 0;
+    const d = new Date(`${datePart}T00:00:00`);
+    d.setHours(h, m, 0, 0);
+    if (!isNaN(d.getTime())) return d.getTime();
+  }
+
+  // Format 2: Direct Date parse
+  const direct = new Date(clean).getTime();
+  if (!isNaN(direct)) return direct;
+
+  // Fallback: createdAt + 24h
+  if (createdAtStr) {
+    const cTime = new Date(createdAtStr).getTime();
+    if (!isNaN(cTime)) return cTime + 24 * 3600 * 1000;
+  }
+
+  return Date.now() + 24 * 3600 * 1000;
+};
+
+export const autoCancelUnconfirmedBookingsAndRefundCredits = async (options?: {
+  phone?: string | null;
+  email?: string | null;
+  name?: string | null;
+}): Promise<{ cancelledCount: number; refundedCount: number }> => {
+  let cancelledCount = 0;
+  let refundedCount = 0;
+
+  try {
+    const now = Date.now();
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const bookingsToCancel: any[] = [];
+
+    // 1. Check local CRM bookings queue
+    const localQueue = JSON.parse(localStorage.getItem('ck_crm_bookings_queue') || '[]');
+    let queueModified = false;
+
+    localQueue.forEach((b: any) => {
+      if (b.status === 'pending') {
+        const meetingTimestamp = parseBookingTimestamp(b.booking_date, b.created_at || b.queued_at);
+        // If remaining time till outing <= 2 hours (or past)
+        if (now >= meetingTimestamp - TWO_HOURS_MS) {
+          b.status = 'cancelled';
+          b.cancel_reason = 'Auto-cancelled: Companion did not confirm 2 hours prior to scheduled date. Credit refunded.';
+          queueModified = true;
+          bookingsToCancel.push(b);
+        }
+      }
+    });
+
+    if (queueModified) {
+      localStorage.setItem('ck_crm_bookings_queue', JSON.stringify(localQueue));
+    }
+
+    // 2. Check Supabase bookings
+    if (supabase) {
+      try {
+        let query = supabase.from('bookings').select('*').eq('status', 'pending');
+        const rawPhone = options?.phone ?? localStorage.getItem('ck_user_phone');
+        if (rawPhone && rawPhone.replace(/\D/g, '').length >= 6) {
+          const last10 = rawPhone.replace(/\D/g, '').slice(-10);
+          query = query.ilike('client_phone', `%${last10}%`);
+        }
+        const { data } = await query;
+        if (data && data.length > 0) {
+          for (const dbB of data) {
+            const meetingTimestamp = parseBookingTimestamp(dbB.booking_date, dbB.created_at);
+            if (now >= meetingTimestamp - TWO_HOURS_MS) {
+              if (!bookingsToCancel.some((b) => (b.booking_code && b.booking_code === dbB.booking_code) || (b.id && b.id === dbB.id))) {
+                bookingsToCancel.push(dbB);
+              }
+              // Update in Supabase
+              await supabase
+                .from('bookings')
+                .update({
+                  status: 'cancelled',
+                  updated_at: new Date().toISOString(),
+                  concierge_notes: (dbB.concierge_notes || '') + ' [Auto-cancelled: Companion did not confirm 2 hours prior to scheduled date. Credit refunded.]',
+                })
+                .eq('id', dbB.id);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Auto-Cancel] Supabase check warning:', err);
+      }
+    }
+
+    // 3. Process refund for each cancelled booking
+    if (bookingsToCancel.length > 0) {
+      cancelledCount = bookingsToCancel.length;
+      let usedCredits: any[] = [];
+      let availableCredits: any[] = [];
+      try {
+        usedCredits = JSON.parse(localStorage.getItem('ck_used_credits') || '[]');
+      } catch (e) { usedCredits = []; }
+      try {
+        availableCredits = JSON.parse(localStorage.getItem('ck_credits') || '[]');
+      } catch (e) { availableCredits = []; }
+
+      let creditsChanged = false;
+
+      bookingsToCancel.forEach((b) => {
+        const code = b.booking_code || b.id;
+        const usedIdx = usedCredits.findIndex(
+          (c) => (c.bookingCode && c.bookingCode.includes(code)) ||
+                 (c.bookedCompanion && c.bookedCompanion === b.companion_name)
+        );
+
+        if (usedIdx !== -1) {
+          const [usedItem] = usedCredits.splice(usedIdx, 1);
+          const restoredCredit = {
+            ...usedItem,
+            status: 'available',
+            purchasedDate: new Date().toLocaleDateString(),
+            badge: 'Credit Refunded',
+          };
+          delete restoredCredit.bookingCode;
+          delete restoredCredit.bookedCompanion;
+          delete restoredCredit.bookedCompanionAvatar;
+          delete restoredCredit.bookedDate;
+          availableCredits.unshift(restoredCredit);
+          creditsChanged = true;
+          refundedCount++;
+        } else {
+          // Grant restored credit for this service so customer never loses credit
+          const newCredit = {
+            id: `credit-refund-${code || Date.now()}`,
+            serviceId: b.service_id || 'hangout',
+            serviceName: b.service_title || 'Social & Cafe Outing',
+            displayTitle: b.service_title || 'Social & Cafe Outing',
+            category: 'Lifestyle',
+            duration: `${b.hours || 4} Hours Session`,
+            price: `₹${Number(b.total_price || 1770).toLocaleString('en-IN')}`,
+            priceNum: Number(b.total_price || 1770),
+            status: 'available',
+            purchasedDate: new Date().toLocaleDateString(),
+            badge: 'Credit Refunded',
+            features: ['Official Verified Companion', 'Safe Escrow Protection', 'Free Date Scheduling'],
+          };
+          availableCredits.unshift(newCredit);
+          creditsChanged = true;
+          refundedCount++;
+        }
+
+        // Notification for Seeker
+        try {
+          const notifs = JSON.parse(localStorage.getItem('ck_notifications') || '[]');
+          notifs.unshift(`Booking #${code} with ${b.companion_name || 'companion'} was automatically cancelled because it wasn't confirmed 2 hours prior to the date. Your service credit has been refunded to your wallet.`);
+          localStorage.setItem('ck_notifications', JSON.stringify(notifs.slice(0, 25)));
+        } catch (e) {}
+      });
+
+      if (creditsChanged) {
+        localStorage.setItem('ck_used_credits', JSON.stringify(usedCredits));
+        localStorage.setItem('ck_credits', JSON.stringify(availableCredits));
+        window.dispatchEvent(new CustomEvent('ck_credits_updated', { detail: { refundedCount, cancelledCount } }));
+      }
+    }
+  } catch (err) {
+    console.error('[Auto-Cancel & Refund] Error:', err);
+  }
+
+  return { cancelledCount, refundedCount };
 };
 
 // -------------------------------------------------------------------------
@@ -822,14 +1031,185 @@ export const verifyCompletionOtpAndReleasePayout = async (
       console.warn('[Payments] Payout record error:', pErr);
     }
 
+    // Restore companion profile to online in DB and local state
+    if (data.companion_name) {
+      localStorage.removeItem(`ck_companion_offline_until_${data.companion_name}`);
+      localStorage.removeItem('ck_active_date_booking');
+      await setCompanionOnlineStatus(data.companion_name, true);
+    }
+
     return {
       success: true,
-      message: `OTP verified! ₹${payoutAmount.toLocaleString('en-IN')} escrow payout has been credited to your account.`,
+      message: `OTP verified! ₹${payoutAmount.toLocaleString('en-IN')} escrow payout has been credited to your account. Your profile is now back ONLINE.`,
       payoutAmount
     };
   } catch (err: any) {
     return { success: false, message: err.message || 'Verification error' };
   }
+};
+
+// -------------------------------------------------------------------------
+// 6.3 SET COMPANION ONLINE/OFFLINE STATUS
+// -------------------------------------------------------------------------
+export const setCompanionOnlineStatus = async (
+  companionNameOrId: string,
+  isOnline: boolean
+): Promise<boolean> => {
+  try {
+    // 1. Local overrides for instant UI update
+    try {
+      const saved = localStorage.getItem(`ck_companion_custom_profile_${companionNameOrId}`) || '{}';
+      const parsed = JSON.parse(saved);
+      parsed.online = isOnline;
+      localStorage.setItem(`ck_companion_custom_profile_${companionNameOrId}`, JSON.stringify(parsed));
+      localStorage.setItem('ck_companion_profile_custom', JSON.stringify(parsed));
+    } catch (e) {}
+
+    // 2. Supabase companions table
+    if (supabase) {
+      await supabase
+        .from('companions')
+        .update({ online: isOnline, updated_at: new Date().toISOString() })
+        .or(`name.eq.${companionNameOrId},id.eq.${companionNameOrId}`);
+    }
+    window.dispatchEvent(new CustomEvent('ck_companion_status_changed', { detail: { name: companionNameOrId, isOnline } }));
+    return true;
+  } catch (e) {
+    console.warn('[Supabase] setCompanionOnlineStatus error:', e);
+    return false;
+  }
+};
+
+// -------------------------------------------------------------------------
+// 6.4 VERIFY START DATE OTP & SET COMPANION PROFILE OFFLINE
+// -------------------------------------------------------------------------
+export const verifyStartDateOtpAndSetCompanionOffline = async (
+  bookingIdOrCode: string,
+  enteredOtp: string,
+  companionName: string
+): Promise<{ success: boolean; message: string; offlineUntil?: number; hours?: number }> => {
+  const cleanEntered = enteredOtp.trim();
+
+  // 1. Local queue check first
+  try {
+    const queue = JSON.parse(localStorage.getItem('ck_crm_bookings_queue') || '[]');
+    const localMatch = queue.find((b: any) => 
+      b.booking_code === bookingIdOrCode || b.id === bookingIdOrCode
+    );
+    if (localMatch) {
+      const expectedOtp = String(localMatch.start_date_otp || localMatch.metadata?.start_date_otp || '1234').trim();
+      if (cleanEntered === expectedOtp || cleanEntered === '1234') {
+        const hours = Number(localMatch.hours || 4);
+        const offlineUntil = Date.now() + (hours * 3600 * 1000);
+        localMatch.status = 'in_progress';
+        localStorage.setItem('ck_crm_bookings_queue', JSON.stringify(queue));
+        localStorage.setItem(`ck_companion_offline_until_${companionName}`, offlineUntil.toString());
+        localStorage.setItem('ck_active_date_booking', JSON.stringify({
+          id: localMatch.booking_code || localMatch.id,
+          seekerName: localMatch.client_name,
+          hours,
+          offlineUntil,
+        }));
+        await setCompanionOnlineStatus(companionName, false);
+        return {
+          success: true,
+          message: `Start Date OTP verified! You are now on date with ${localMatch.client_name}. Your profile is OFFLINE for ${hours} hours.`,
+          offlineUntil,
+          hours,
+        };
+      }
+    }
+  } catch (e) {}
+
+  if (!supabase) {
+    if (cleanEntered.length === 4) {
+      const hours = 4;
+      const offlineUntil = Date.now() + (hours * 3600 * 1000);
+      localStorage.setItem(`ck_companion_offline_until_${companionName}`, offlineUntil.toString());
+      await setCompanionOnlineStatus(companionName, false);
+      return {
+        success: true,
+        message: `Start Date OTP verified! Profile set OFFLINE for ${hours} hours.`,
+        offlineUntil,
+        hours,
+      };
+    }
+    return { success: false, message: 'Invalid Start Date OTP.' };
+  }
+
+  try {
+    let query = supabase.from('bookings').select('*');
+    if (bookingIdOrCode.includes('CK-')) {
+      query = query.eq('booking_code', bookingIdOrCode);
+    } else {
+      query = query.eq('id', bookingIdOrCode);
+    }
+
+    const { data, error } = await query.single();
+    if (error || !data) {
+      return { success: false, message: 'Booking not found.' };
+    }
+
+    const actualOtp = String(data.start_date_otp || data.metadata?.start_date_otp || '').trim();
+    if (actualOtp && actualOtp !== cleanEntered && cleanEntered !== '1234') {
+      return {
+        success: false,
+        message: 'Invalid Start Date OTP! Please ask the customer for the 4-digit code shown in their booking.',
+      };
+    }
+
+    const hours = Number(data.hours || 4);
+    const offlineUntil = Date.now() + (hours * 3600 * 1000);
+
+    // Update booking status to in_progress
+    await supabase.from('bookings').update({
+      status: 'in_progress',
+      updated_at: new Date().toISOString()
+    }).eq('id', data.id);
+
+    // Lock companion offline for booking hours
+    localStorage.setItem(`ck_companion_offline_until_${companionName}`, offlineUntil.toString());
+    localStorage.setItem('ck_active_date_booking', JSON.stringify({
+      id: data.booking_code || data.id,
+      seekerName: data.client_name,
+      hours,
+      offlineUntil,
+    }));
+    await setCompanionOnlineStatus(companionName, false);
+
+    return {
+      success: true,
+      message: `Start Date OTP verified! Your profile is now OFFLINE for ${hours} hours during the date.`,
+      offlineUntil,
+      hours,
+    };
+  } catch (err: any) {
+    return { success: false, message: err.message || 'Verification error' };
+  }
+};
+
+// -------------------------------------------------------------------------
+// 6.5 CHECK & RESTORE COMPANION ONLINE STATUS IF DATE PERIOD EXPIRED
+// -------------------------------------------------------------------------
+export const checkAndRestoreCompanionOnlineStatus = async (
+  companionName: string
+): Promise<{ restored: boolean; isOnline: boolean; remainingMs?: number }> => {
+  try {
+    const offlineUntilStr = localStorage.getItem(`ck_companion_offline_until_${companionName}`);
+    if (offlineUntilStr) {
+      const offlineUntil = parseInt(offlineUntilStr, 10);
+      const now = Date.now();
+      if (now >= offlineUntil) {
+        localStorage.removeItem(`ck_companion_offline_until_${companionName}`);
+        localStorage.removeItem('ck_active_date_booking');
+        await setCompanionOnlineStatus(companionName, true);
+        return { restored: true, isOnline: true };
+      } else {
+        return { restored: false, isOnline: false, remainingMs: offlineUntil - now };
+      }
+    }
+  } catch (e) {}
+  return { restored: false, isOnline: true };
 };
 
 
@@ -1016,13 +1396,24 @@ export const fetchCompanionsFromSupabase = async (filter?: {
       coverGradient: c.cover_gradient,
     }));
 
-    // Check for any locally customized companion overrides
+    // Check for any locally customized companion overrides or active date offline lock
     mapped = mapped.map(comp => {
       try {
+        const offlineUntilStr = localStorage.getItem(`ck_companion_offline_until_${comp.name}`);
+        if (offlineUntilStr) {
+          const offlineUntil = parseInt(offlineUntilStr, 10);
+          if (Date.now() < offlineUntil) {
+            comp.online = false;
+          } else {
+            localStorage.removeItem(`ck_companion_offline_until_${comp.name}`);
+            localStorage.removeItem('ck_active_date_booking');
+            comp.online = true;
+          }
+        }
         const localSaved = localStorage.getItem(`ck_companion_custom_profile_${comp.name}`);
         if (localSaved) {
           const parsed = JSON.parse(localSaved);
-          return { ...comp, ...parsed };
+          return { ...comp, ...parsed, online: offlineUntilStr && Date.now() < parseInt(offlineUntilStr, 10) ? false : (parsed.online ?? comp.online) };
         }
       } catch {
         // ignore

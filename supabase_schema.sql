@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS public.bookings (
     companion_avatar TEXT,
     status TEXT DEFAULT 'pending', -- 'pending', 'matched', 'confirmed', 'in_progress', 'completed', 'cancelled'
     payment_status TEXT DEFAULT 'unpaid', -- 'unpaid', 'pending', 'paid', 'refunded'
+    start_date_otp TEXT, -- 4-digit code provided by seeker to start date and set companion offline
+    completion_otp TEXT, -- 4-digit code provided by seeker to complete date and release payout
+    payout_released BOOLEAN DEFAULT false,
     concierge_notes TEXT,
     metadata JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
