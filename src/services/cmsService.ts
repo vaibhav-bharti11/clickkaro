@@ -10,7 +10,12 @@ const mergeWithDefaults = (source: Partial<CmsSiteContent>): CmsSiteContent => {
     ...DEFAULT_CMS_CONTENT,
     ...source,
     navbar: { ...DEFAULT_CMS_CONTENT.navbar, ...(source.navbar || {}) },
-    hero: { ...DEFAULT_CMS_CONTENT.hero, ...(source.hero || {}) },
+    hero: { 
+      ...DEFAULT_CMS_CONTENT.hero, 
+      ...(source.hero || {}),
+      mainHeadline: (source.hero?.mainHeadline || DEFAULT_CMS_CONTENT.hero.mainHeadline).replace(/MEETUP/gi, 'MEET'),
+      highlightWords: (source.hero?.highlightWords || DEFAULT_CMS_CONTENT.hero.highlightWords).map((w: string) => w.replace(/MEETUP/gi, 'MEET')),
+    },
     statsBar: { ...DEFAULT_CMS_CONTENT.statsBar, ...(source.statsBar || {}) },
     services: { ...DEFAULT_CMS_CONTENT.services, ...(source.services || {}) },
     pricing: { ...DEFAULT_CMS_CONTENT.pricing, ...(source.pricing || {}) },

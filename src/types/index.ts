@@ -97,6 +97,11 @@ export interface CompanionProfile {
   distanceKm: number;
   languages: string[];
   services: string[];
+  hobbies?: string[];
+  availability?: Record<string, string>;
+  memberSince?: string;
+  reviewsList?: Array<{ rating: number; date: string; comment?: string }>;
+  coverGradient?: string;
 }
 
 export interface BookingRequest {

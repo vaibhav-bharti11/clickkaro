@@ -11,6 +11,7 @@ interface NavbarProps {
   onOpenSearch: () => void;
   onOpenAuth: (mode?: 'signin' | 'signup') => void;
   onOpenEvents?: () => void;
+  onOpenAboutUs?: () => void;
   currentRole?: UserRole;
   userName?: string;
   userAvatar?: string;
@@ -25,6 +26,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenPartnerJoin: _onOpenPartnerJoin,
   onOpenAuth,
   onOpenEvents,
+  onOpenAboutUs,
   userName,
   userAvatar,
   onLogout,
@@ -104,7 +106,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* 4. About Us */}
           <button 
             type="button"
-            onClick={() => setShowAboutModal(true)}
+            onClick={() => onOpenAboutUs ? onOpenAboutUs() : setShowAboutModal(true)}
             className="text-xs sm:text-[13px] font-bold text-[#1d1d1f] hover:text-[#0071e3] transition-colors px-3 py-1.5 rounded-full hover:bg-black/[0.04] apple-focus cursor-pointer whitespace-nowrap"
           >
             About Us
@@ -264,7 +266,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* 3. About Us */}
           <button 
             type="button"
-            onClick={() => { setMobileMenuOpen(false); setShowAboutModal(true); }}
+            onClick={() => { 
+              setMobileMenuOpen(false); 
+              if (onOpenAboutUs) onOpenAboutUs(); 
+              else setShowAboutModal(true); 
+            }}
             className="text-left text-base font-bold text-[#1d1d1f] hover:text-[#0071e3] transition py-2.5 px-3.5 rounded-2xl hover:bg-pink-50/60 flex items-center justify-between cursor-pointer"
           >
             <span>About Us</span>

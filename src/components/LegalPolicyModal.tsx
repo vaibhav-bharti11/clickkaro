@@ -1,395 +1,331 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, Lock, RefreshCw, FileText, CheckCircle2, AlertTriangle, Building2, Scale } from 'lucide-react';
-import { useCms } from '../context/CmsContext';
-
-export type PolicyTab = 'privacy' | 'refund' | 'terms';
+import { X, ShieldCheck, CheckCircle2, AlertTriangle, Scale, Lock, RefreshCw, HelpCircle } from 'lucide-react';
 
 interface LegalPolicyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: PolicyTab;
+  defaultTab?: 'privacy' | 'refund' | 'conduct' | 'grievance' | 'terms';
+  initialTab?: 'privacy' | 'refund' | 'conduct' | 'grievance' | 'terms';
 }
 
 export const LegalPolicyModal: React.FC<LegalPolicyModalProps> = ({
   isOpen,
   onClose,
-  initialTab = 'privacy',
+  defaultTab = 'conduct',
+  initialTab,
 }) => {
-  const { content } = useCms();
-  const [activeTab, setActiveTab] = useState<PolicyTab>(initialTab);
+  const chosenTab = initialTab || defaultTab;
+  const normalizedTab = chosenTab === 'terms' ? 'conduct' : (chosenTab as 'privacy' | 'refund' | 'conduct' | 'grievance');
+  const [activeTab, setActiveTab] = useState<'privacy' | 'refund' | 'conduct' | 'grievance'>(normalizedTab);
+
+  React.useEffect(() => {
+    if (chosenTab) {
+      setActiveTab(chosenTab === 'terms' ? 'conduct' : (chosenTab as any));
+    }
+  }, [chosenTab, isOpen]);
 
   if (!isOpen) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md animate-fade-in"
-    >
-      <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 border border-stone-200 shadow-[0_25px_70px_rgba(0,0,0,0.2)] relative flex flex-col max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-pink-100 overflow-hidden font-sans">
         
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-stone-100 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-pink-50 text-[#FF2D55] flex items-center justify-center">
-              <Scale className="w-5 h-5" />
-            </div>
+        <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between bg-gradient-to-r from-pink-50/50 via-white to-white">
+          <div className="flex items-center gap-3">
+            <img 
+              src="/assets/brand_logo.png" 
+              alt="Click Karo Date Karo" 
+              className="h-8 w-auto object-contain"
+            />
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-display font-black text-lg sm:text-xl text-[#111827]">
-                  Legal &amp; Policy Portal
-                </span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
-                  IT Act, 2000 Compliant
-                </span>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-[#FF2D55]" />
+                <h2 className="font-display font-black text-lg text-[#111827]">
+                  Click Karo Date Karo Legal &amp; Policy Portal
+                </h2>
               </div>
-              <p className="text-xs text-[#6B7280]">
-                {content.footer?.brandName || 'Click Karo Date Karo'} ({content.footer?.parentCompany || 'A unit of AMBER VENTURES (OPC) PVT LTD'})
+              <p className="text-[11px] text-stone-500 font-medium">
+                Operated by Amber Ventures (OPC) Pvt Ltd • Statutory Compliance under IT Act, 2000 &amp; DPDP Act, 2023
               </p>
             </div>
           </div>
-
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 transition cursor-pointer"
+            className="w-8 h-8 rounded-full hover:bg-stone-100 flex items-center justify-center text-stone-400 hover:text-stone-700 transition cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-2 p-1.5 bg-stone-100/80 rounded-2xl my-4 shrink-0" role="tablist">
+        <div className="flex border-b border-stone-100 px-6 bg-stone-50/50 overflow-x-auto gap-2 py-2">
           <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'privacy'}
+            onClick={() => setActiveTab('conduct')}
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'conduct'
+                ? 'bg-[#111827] text-white shadow-xs'
+                : 'text-stone-600 hover:bg-white'
+            }`}
+          >
+            <Scale className="w-3.5 h-3.5" />
+            <span>Code of Conduct</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('privacy')}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shrink-0 ${
               activeTab === 'privacy'
-                ? 'bg-white text-[#111827] shadow-xs'
-                : 'text-stone-500 hover:text-stone-900'
+                ? 'bg-[#111827] text-white shadow-xs'
+                : 'text-stone-600 hover:bg-white'
             }`}
           >
-            <Lock className="w-3.5 h-3.5 text-[#0071E3]" />
-            <span>Privacy Policy</span>
+            <Lock className="w-3.5 h-3.5" />
+            <span>Privacy Policy (DPDP 2023)</span>
           </button>
 
           <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'refund'}
             onClick={() => setActiveTab('refund')}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shrink-0 ${
               activeTab === 'refund'
-                ? 'bg-white text-[#111827] shadow-xs'
-                : 'text-stone-500 hover:text-stone-900'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-stone-600 hover:bg-white'
             }`}
           >
-            <RefreshCw className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Refund &amp; Cancellation</span>
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>100% Refund &amp; Cancellation</span>
           </button>
 
           <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'terms'}
-            onClick={() => setActiveTab('terms')}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === 'terms'
-                ? 'bg-white text-[#111827] shadow-xs'
-                : 'text-stone-500 hover:text-stone-900'
+            onClick={() => setActiveTab('grievance')}
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'grievance'
+                ? 'bg-[#0071E3] text-white shadow-xs'
+                : 'text-stone-600 hover:bg-white'
             }`}
           >
-            <FileText className="w-3.5 h-3.5 text-purple-600" />
-            <span>Terms of Service</span>
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>Safety &amp; Grievance Redressal</span>
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="overflow-y-auto no-scrollbar pr-1 space-y-6 text-xs sm:text-sm text-stone-700 font-sans leading-relaxed flex-1">
+        {/* Modal Body */}
+        <div className="p-6 overflow-y-auto space-y-6 text-stone-700 text-xs sm:text-sm leading-relaxed">
           
-          {/* TAB 1: PRIVACY POLICY (Full IT Act, 2000 & IT Rules 2011 compliance) */}
+          {/* TAB 1: CODE OF CONDUCT */}
+          {activeTab === 'conduct' && (
+            <div className="space-y-5 animate-fade-in">
+              <div className="p-4 rounded-2xl bg-pink-50/60 border border-pink-100 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-[#FF2D55] shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-bold text-sm text-[#111827]">
+                    Official Code of Conduct &amp; Platform Rules
+                  </h3>
+                  <p className="text-xs text-stone-600 mt-1">
+                    Click Karo Date Karo (a unit of Amber Ventures (OPC) Pvt Ltd) strictly provides dignified, verified social companionship and lifestyle accompaniment for public venues. We maintain zero tolerance for any misconduct.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <section>
+                  <h4 className="font-bold text-sm text-[#111827] mb-1.5">1. Strict Public-Venue Mandate</h4>
+                  <p className="text-xs text-stone-600">
+                    All companion meetups, coffee sessions, dining, events, and hangouts must occur exclusively in verified public venues (cafes, malls, multiplexes, reputable restaurants, exhibitions, or tourist attractions). Companions and seekers are strictly barred from meeting in private residences, hotel rooms, or secluded private properties.
+                  </p>
+                </section>
+
+                <section>
+                  <h4 className="font-bold text-sm text-[#111827] mb-1.5">2. Absolute Prohibition of Adult or Escort Services</h4>
+                  <p className="text-xs text-stone-600">
+                    Click Karo Date Karo does NOT provide, encourage, or facilitate adult entertainment, escorting, sexual services, or commercial dating. Any user attempting to solicit unpermitted activities will be permanently banned immediately, have their security deposit forfeited, and will be reported to law enforcement authorities under the Information Technology Act and Bharatiya Nyaya Sanhita.
+                  </p>
+                </section>
+
+                <section>
+                  <h4 className="font-bold text-sm text-[#111827] mb-1.5">3. Mutual Respect, Dignity &amp; Personal Boundaries</h4>
+                  <p className="text-xs text-stone-600">
+                    Companions and clients are autonomous individuals entitled to complete physical and emotional boundaries. Unwanted physical contact, verbal harassment, coercion, offensive language, or intoxication during sessions is strictly prohibited.
+                  </p>
+                </section>
+
+                <section>
+                  <h4 className="font-bold text-sm text-[#111827] mb-1.5">4. Booking Protocol &amp; OTP Completion</h4>
+                  <p className="text-xs text-stone-600">
+                    Every session is booked via the official Click Karo Date Karo portal. At the conclusion of a successful session, the companion provides a 4-digit session completion OTP to ensure accurate hours and safety accounting. Offline, unmonitored cash deals outside the platform void all safety guarantees.
+                  </p>
+                </section>
+
+                <section>
+                  <h4 className="font-bold text-sm text-[#111827] mb-1.5">5. Minimum Age Requirement</h4>
+                  <p className="text-xs text-stone-600">
+                    Users and companions must be at least 18 years of age. All users must verify their age via Aadhaar KYC and biometric face matching.
+                  </p>
+                </section>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: PRIVACY POLICY */}
           {activeTab === 'privacy' && (
-            <div className="space-y-5">
-              <div className="p-4 rounded-2xl bg-pink-50/70 border border-pink-100">
-                <h3 className="font-display font-bold text-sm text-[#111827] mb-1">
-                  Data Protection Commitment
-                </h3>
-                <p className="text-xs text-stone-600">
-                  <strong>Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD)</strong> is committed to protecting your privacy in accordance with the <strong>Information Technology Act, 2000</strong>, <strong>Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011</strong>, and other applicable Indian laws.
-                </p>
-              </div>
-
-              {/* 1. Data Controller */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-stone-900 text-sm flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-[#0071E3]" />
-                  <span>1. Data Controller</span>
-                </h4>
-                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/70 space-y-1.5 text-xs">
-                  <div><strong>Company:</strong> Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD)</div>
-                  <div><strong>Website:</strong> <a href="https://www.kopartner.in" target="_blank" rel="noreferrer" className="text-[#0071E3] underline">www.kopartner.in</a></div>
-                  <div><strong>Data Protection Officer (DPO):</strong> dpo@kopartner.in</div>
-                  <div><strong>Grievance Officer:</strong> grievance@kopartner.in</div>
-                  <div><strong>Privacy Support:</strong> privacy@kopartner.in</div>
+            <div className="space-y-5 animate-fade-in">
+              <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-start gap-3">
+                <Lock className="w-5 h-5 text-[#0071E3] shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-bold text-sm text-[#111827]">
+                    Privacy Policy &amp; Data Protection (DPDP Act, 2023)
+                  </h3>
+                  <p className="text-xs text-stone-600 mt-1">
+                    Operated by Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD). We honor your right to privacy with cryptographic safeguards and zero data monetization.
+                  </p>
                 </div>
               </div>
 
-              {/* 2. Information We Collect */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-stone-900 text-sm">2. Information We Collect</h4>
-                
-                <div className="space-y-2 text-xs">
-                  <div className="p-3 rounded-xl bg-stone-50 border border-stone-200/60">
-                    <strong className="text-stone-900 block mb-1">2.1 Personal Information (Collected with Consent)</strong>
-                    <ul className="list-disc pl-5 space-y-1 text-stone-600">
-                      <li>Full name, email address, mobile number</li>
-                      <li>Profile photograph, bio/description, and gallery photos</li>
-                      <li>City, pin code, and service area</li>
-                      <li>Date of birth and gender (strictly for 18+ age verification)</li>
-                      <li>UPI ID (for verified payouts and refunds)</li>
-                      <li>Government-issued ID (Aadhaar / KYC for verified KoPartners only)</li>
-                      <li>Bank account details (KoPartners only, for payouts)</li>
-                    </ul>
-                  </div>
+              <div className="space-y-4">
+                <section>
+                  <h4 className="font-bold text-sm text-[#111827] mb-1.5">1. Information We Collect</h4>
+                  <ul className="list-disc pl-5 space-y-1 text-xs text-stone-600">
+                    <li><strong>Account Identifiers:</strong> Name, verified phone number, email address, and city/pin code.</li>
+                    <li><strong>Identity Verification:</strong> Masked Aadhaar number and live facial biometric selfie for identity verification. Aadhaar images are immediately redacted and securely vaulted.</li>
+                    <li><strong>Booking Records:</strong> Service chosen, scheduled date/time, venue details, and payment transaction IDs.</li>
+                  </ul>
+                </section>
 
-                  <div className="p-3 rounded-xl bg-purple-50/60 border border-purple-100">
-                    <strong className="text-purple-900 block mb-1">2.2 Sensitive Personal Data or Information (SPDI)</strong>
-                    <p className="text-stone-600 mb-1.5">As defined under IT (Reasonable Security Practices) Rules, 2011:</p>
-                    <ul className="list-disc pl-5 space-y-1 text-stone-600">
-                      <li>Financial information (bank account &amp; UPI ID for payouts - KoPartners only)</li>
-                      <li>Biometric data (facial recognition AI check for verification)</li>
-                      <li>Government ID numbers (Aadhaar/PAN for KYC verification)</li>
-                    </ul>
-                    <div className="mt-2 p-2 rounded-lg bg-white border border-purple-200 text-purple-950 font-bold text-[11px]">
-                      🔒 IMPORTANT: We do NOT collect or store Payment card numbers, CVV, UPI PIN, internet banking credentials, or any payment authentication data.
-                    </div>
-                  </div>
+                <section>
+                  <h4 className="font-bold text-sm text-[#111827] mb-1.5">2. Zero Third-Party Selling</h4>
+                  <p className="text-xs text-stone-600">
+                    Click Karo Date Karo will never sell, lease, or rent your personal identifiable information or phone number to any third-party marketing agency or ad network.
+                  </p>
+                </section>
 
-                  <div className="p-3 rounded-xl bg-stone-50 border border-stone-200/60">
-                    <strong className="text-stone-900 block mb-1">2.3 Automatically Collected Information</strong>
-                    <ul className="list-disc pl-5 space-y-1 text-stone-600">
-                      <li>Device information (device type, operating system, browser)</li>
-                      <li>IP address and approximate geolocation</li>
-                      <li>Usage data, booking activity, and analytics</li>
-                      <li>Cookies and essential session tracking technologies</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
+                <section>
+                  <h4 className="font-bold text-sm text-[#111827] mb-1.5">3. Data Security &amp; Encryption</h4>
+                  <p className="text-xs text-stone-600">
+                    All communication between your browser and our servers is secured via 256-bit TLS encryption. Sensitive KYC data is encrypted at rest using industry standard AES-256 protocols.
+                  </p>
+                </section>
 
-              {/* 3. Purpose of Data Collection */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-stone-900 text-sm">3. Purpose of Data Collection</h4>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <li className="p-2.5 rounded-xl bg-stone-50 border border-stone-200/60">
-                    <strong>Service Delivery:</strong> To facilitate connections between Clients and KoPartners
-                  </li>
-                  <li className="p-2.5 rounded-xl bg-stone-50 border border-stone-200/60">
-                    <strong>Identity Verification:</strong> To verify user identities and ensure platform safety
-                  </li>
-                  <li className="p-2.5 rounded-xl bg-stone-50 border border-stone-200/60">
-                    <strong>Payment Processing:</strong> To verify payments and process payouts to KoPartners
-                  </li>
-                  <li className="p-2.5 rounded-xl bg-stone-50 border border-stone-200/60">
-                    <strong>Communication:</strong> To send booking confirmations, updates, and support messages
-                  </li>
-                  <li className="p-2.5 rounded-xl bg-stone-50 border border-stone-200/60">
-                    <strong>Safety &amp; Security:</strong> To detect fraud, prevent abuse, and ensure user safety
-                  </li>
-                  <li className="p-2.5 rounded-xl bg-stone-50 border border-stone-200/60">
-                    <strong>Legal Compliance:</strong> To comply with applicable laws and statutory requests
-                  </li>
-                </ul>
-              </div>
-
-              {/* 4. Legal Basis for Processing */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-stone-900 text-sm">4. Legal Basis for Processing</h4>
-                <p className="text-xs text-stone-600">
-                  We process your data based on: <strong>Consent</strong> (Section 43A, IT Act), <strong>Contract</strong> (Terms of Service), <strong>Legal Obligation</strong> (Indian laws), and <strong>Legitimate Interests</strong> (Safety &amp; anti-fraud). You may withdraw consent at any time by contacting <strong>privacy@kopartner.in</strong>.
-                </p>
-              </div>
-
-              {/* 5. Information Sharing & Disclosure */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-stone-900 text-sm">5. Information Sharing &amp; Disclosure</h4>
-                <p className="text-xs text-stone-600">
-                  Information is shared only with confirmed matched users for service delivery, authorized payment gateways, or law enforcement when legally mandated under court order. <strong>We NEVER sell, rent, or trade your personal information to third parties for marketing.</strong>
-                </p>
-              </div>
-
-              {/* 6. Data Security Measures */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-stone-900 text-sm">6. Data Security Measures (IT Rules, 2011)</h4>
-                <div className="grid grid-cols-2 gap-2 text-xs text-stone-600">
-                  <div className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-100 flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>SSL/TLS 256-bit encryption</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-100 flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>AES-256 at rest encryption</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-100 flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>Role-based access controls</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-100 flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>Intrusion detection systems</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 7. Data Retention */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-stone-900 text-sm">7. Data Retention</h4>
-                <p className="text-xs text-stone-600">
-                  Active accounts retain data during usage. Backups are retained up to 180 days. Statutory financial records are preserved up to 8 years under Indian tax regulations. Upon account deletion request, your personal data is permanently deleted or anonymized within <strong>90 days</strong>.
-                </p>
-              </div>
-
-              {/* 8. Your Rights */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-stone-900 text-sm">8. Your Rights</h4>
-                <p className="text-xs text-stone-600">
-                  Under Indian law, you have the right to: <strong>Access</strong> your data, <strong>Correct</strong> inaccurate data, <strong>Delete</strong> your account &amp; data, <strong>Withdraw Consent</strong>, and <strong>Portability</strong>. Email <strong>privacy@kopartner.in</strong> to exercise your rights.
-                </p>
-              </div>
-
-              {/* 9. Cookies */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-stone-900 text-sm">9. Cookies &amp; Tracking Technologies</h4>
-                <p className="text-xs text-stone-600">
-                  We use essential security cookies for authentication and anti-abuse protection.
-                </p>
-              </div>
-
-              {/* 10. Children's Privacy */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-rose-900 text-sm flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-rose-600" />
-                  <span>10. Children's Privacy (Strictly 18+)</span>
-                </h4>
-                <p className="text-xs text-stone-600">
-                  KoPartner is strictly NOT intended for use by persons under 18 years of age. Date of Birth verification is mandatory. Any minor accounts discovered are deleted immediately.
-                </p>
-              </div>
-
-              {/* 11 & 12. Changes & Grievance */}
-              <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 text-xs space-y-2">
-                <h4 className="font-bold text-stone-900 text-sm">11 &amp; 12. Grievance Redressal &amp; Response Timeline</h4>
-                <p className="text-stone-600">
-                  <strong>Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD)</strong><br />
-                  Privacy Officer: privacy@kopartner.in &bull; DPO: dpo@kopartner.in &bull; Grievance Officer: grievance@kopartner.in<br />
-                  Website: www.kopartner.in<br />
-                  <strong>Statutory Response Time:</strong> Within 30 days of receiving your request.
-                </p>
+                <section>
+                  <h4 className="font-bold text-sm text-[#111827] mb-1.5">4. Right to Erasure &amp; Portability</h4>
+                  <p className="text-xs text-stone-600">
+                    In compliance with the Digital Personal Data Protection Act, you may request full deletion of your account and associated records by emailing <strong>privacy@clickkarodatekaro.com</strong>.
+                  </p>
+                </section>
               </div>
             </div>
           )}
 
-          {/* TAB 2: REFUND & CANCELLATION POLICY */}
+          {/* TAB 3: 100% REFUND & CANCELLATION */}
           {activeTab === 'refund' && (
-            <div className="space-y-5">
-              <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200">
-                <h3 className="font-display font-bold text-sm text-emerald-950 mb-1 flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4 text-emerald-700" />
-                  <span>Transparent 100% Refund &amp; Cancellation Policy</span>
-                </h3>
-                <p className="text-xs text-emerald-800">
-                  Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD) ensures fair, rapid, and transparent cancellation and refunds for all clients and companions.
-                </p>
+            <div className="space-y-5 animate-fade-in">
+              <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 flex items-start gap-3">
+                <RefreshCw className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-bold text-sm text-[#111827]">
+                    100% Money-Back &amp; Hassle-Free Cancellation Policy
+                  </h3>
+                  <p className="text-xs text-stone-600 mt-1">
+                    At Click Karo Date Karo, your peace of mind and trust are paramount. We back every session with a clear, automated refund promise.
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-3 text-xs sm:text-sm">
-                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
-                  <h4 className="font-bold text-stone-900 text-xs mb-1">1. Cancellation by Client</h4>
-                  <ul className="list-disc pl-5 space-y-1 text-stone-600 text-xs">
-                    <li><strong>More than 4 hours before scheduled time:</strong> 100% Instant Full Refund to wallet credit or original payment method / UPI ID.</li>
-                    <li><strong>Between 2 to 4 hours before scheduled time:</strong> 80% Refund (20% nominal scheduling convenience charge).</li>
-                    <li><strong>Under 2 hours or no-show:</strong> Non-refundable to compensate the companion's reserved travel time.</li>
+              <div className="space-y-4">
+                <section className="bg-stone-50 p-4 rounded-2xl border border-stone-200">
+                  <h4 className="font-bold text-sm text-emerald-700 mb-2">When You Receive a 100% Full Refund:</h4>
+                  <ul className="space-y-2 text-xs text-stone-600">
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <span><strong>Companion Non-Arrival / Cancellation:</strong> If a confirmed companion cancels or fails to arrive at the agreed venue, a 100% refund is initiated immediately.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <span><strong>Early Client Cancellation:</strong> Cancellations made at least 2 hours before the scheduled session start time are eligible for a 100% refund without deduction.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <span><strong>Unfulfilled Booking Request:</strong> If a booking remains unconfirmed or companion matching is unavailable, 100% of your credit/charge is refunded instantly.</span>
+                    </li>
                   </ul>
-                </div>
+                </section>
 
-                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
-                  <h4 className="font-bold text-stone-900 text-xs mb-1">2. Cancellation or Non-Attendance by Companion</h4>
+                <section>
+                  <h4 className="font-bold text-sm text-[#111827] mb-1.5">Refund Settlement Timeline</h4>
                   <p className="text-xs text-stone-600">
-                    If a companion cancels or fails to arrive at the agreed venue, the client receives an <strong>immediate 100% full refund</strong> plus an additional priority rebooking credit.
+                    Refunds can be credited instantly to your Click Karo Date Karo wallet for re-booking or returned to the original source payment method (UPI / Net Banking) within 24 to 48 business hours.
                   </p>
-                </div>
+                </section>
 
-                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
-                  <h4 className="font-bold text-stone-900 text-xs mb-1">3. Refund Processing Timelines</h4>
-                  <ul className="list-disc pl-5 space-y-1 text-stone-600 text-xs">
-                    <li><strong>Wallet Credit Refund:</strong> Instant (within 5 seconds).</li>
-                    <li><strong>UPI ID / Bank Account Refund:</strong> Processed within 24 to 48 business hours.</li>
-                    <li><strong>Card / NetBanking:</strong> 3 to 5 business days per standard banking cycle.</li>
-                  </ul>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
-                  <h4 className="font-bold text-stone-900 text-xs mb-1">4. How to Request a Refund</h4>
+                <section>
+                  <h4 className="font-bold text-sm text-[#111827] mb-1.5">Dispute Escalation</h4>
                   <p className="text-xs text-stone-600">
-                    Go to <strong>Settings &rarr; Transactions</strong> or email <strong>grievance@kopartner.in</strong> with your Booking Reference ID. All refund tickets are audited and resolved within 24 hours.
+                    If an outing was cut short due to companion misconduct or mismatch, contact our priority grievance desk with your Booking ID at <strong>grievance@clickkarodatekaro.com</strong>.
                   </p>
-                </div>
+                </section>
               </div>
             </div>
           )}
 
-          {/* TAB 3: TERMS OF SERVICE */}
-          {activeTab === 'terms' && (
-            <div className="space-y-4 text-xs sm:text-sm">
-              <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-100">
-                <h3 className="font-display font-bold text-sm text-purple-950 mb-1">
-                  Terms of Service &bull; Safe Community Code
-                </h3>
-                <p className="text-xs text-purple-900">
-                  Operated by Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD).
-                </p>
+          {/* TAB 4: SAFETY & GRIEVANCE */}
+          {activeTab === 'grievance' && (
+            <div className="space-y-5 animate-fade-in">
+              <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-100 flex items-start gap-3">
+                <HelpCircle className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-bold text-sm text-[#111827]">
+                    Safety SOS &amp; Statutory Grievance Redressal
+                  </h3>
+                  <p className="text-xs text-stone-600 mt-1">
+                    Appointed pursuant to Rule 3(2) of the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021.
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
-                  <h4 className="font-bold text-stone-900 text-xs mb-1">1. Professional Social &amp; Lifestyle Companionship Only</h4>
-                  <p className="text-xs text-stone-600">
-                    KoPartner is strictly a social companionship and lifestyle meetup platform for public venues (cafes, cinemas, exhibitions, restaurants, shopping, and tours). <strong>We strictly prohibit and do not provide adult, escort, or matrimonial services.</strong>
-                  </p>
+              <div className="p-5 rounded-2xl border border-stone-200 bg-white space-y-3">
+                <h4 className="font-bold text-sm text-[#111827]">Official Grievance Officer</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-stone-600">
+                  <div>
+                    <p className="text-stone-400 font-medium">Designated Officer</p>
+                    <p className="font-bold text-[#111827]">Nodal Grievance Redressal Officer</p>
+                  </div>
+                  <div>
+                    <p className="text-stone-400 font-medium">Corporate Entity</p>
+                    <p className="font-bold text-[#111827]">Amber Ventures (OPC) Pvt Ltd</p>
+                  </div>
+                  <div>
+                    <p className="text-stone-400 font-medium">Grievance Email</p>
+                    <p className="font-bold text-[#FF2D55]">grievance@clickkarodatekaro.com</p>
+                  </div>
+                  <div>
+                    <p className="text-stone-400 font-medium">Data Protection Officer (DPO)</p>
+                    <p className="font-bold text-[#0071E3]">dpo@clickkarodatekaro.com</p>
+                  </div>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
-                  <h4 className="font-bold text-stone-900 text-xs mb-1">2. Zero Tolerance for Harassment</h4>
-                  <p className="text-xs text-stone-600">
-                    Mutual respect, explicit consent, and safe public venue rules are strictly enforced. Any misconduct results in permanent blacklisting, forfeiture of deposits, and immediate police reporting.
-                  </p>
+                <div className="pt-2 border-t border-stone-100 text-xs text-stone-500">
+                  <p><strong>Turnaround Time:</strong> Grievance tickets are formally acknowledged within 24 hours and fully investigated and resolved within 15 calendar days.</p>
                 </div>
+              </div>
 
-                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
-                  <h4 className="font-bold text-stone-900 text-xs mb-1">3. 18+ Age &amp; Aadhaar Verification Mandate</h4>
-                  <p className="text-xs text-stone-600">
-                    All users must be 18+ years of age with genuine date of birth and verified identity documents.
-                  </p>
-                </div>
+              <div className="p-4 rounded-2xl bg-stone-50 text-xs text-stone-600 space-y-1">
+                <p><strong>Official Web Portal:</strong> www.clickkarodatekaro.com</p>
+                <p><strong>Helpline / Support:</strong> support@clickkarodatekaro.com</p>
               </div>
             </div>
           )}
 
         </div>
 
-        {/* Footer actions */}
-        <div className="pt-4 mt-2 border-t border-stone-100 flex items-center justify-between shrink-0">
-          <div className="text-[11px] text-stone-500 flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-[#0071E3]" />
-            <span>Click Karo Date Karo (A unit of AMBER VENTURES (OPC) PVT LTD)</span>
-          </div>
+        {/* Footer */}
+        <div className="px-6 py-3 border-t border-stone-100 flex items-center justify-between bg-stone-50">
+          <span className="text-[11px] text-stone-500">
+            © 2026 Click Karo Date Karo. All rights reserved.
+          </span>
           <button
-            type="button"
             onClick={onClose}
-            className="px-6 py-2.5 rounded-2xl bg-[#111827] hover:bg-[#0071E3] text-white text-xs font-bold transition cursor-pointer"
+            className="px-5 py-2 rounded-full bg-[#111827] hover:bg-[#FF2D55] text-white font-bold text-xs transition cursor-pointer"
           >
-            I Acknowledge &amp; Close
+            Close
           </button>
         </div>
 
@@ -397,5 +333,3 @@ export const LegalPolicyModal: React.FC<LegalPolicyModalProps> = ({
     </div>
   );
 };
-
-export default LegalPolicyModal;

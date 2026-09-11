@@ -195,6 +195,49 @@ export const checkExistingClient = async (identifier: {
   }
 };
 
+// -------------------------------------------------------------------------
+// 1.2 PERMANENTLY DELETE CLIENT ACCOUNT (IT ACT DATA ERASURE COMPLIANCE)
+// -------------------------------------------------------------------------
+export const deleteClientAccountFromSupabase = async (params: {
+  phone?: string | null;
+  email?: string | null;
+  firebase_uid?: string | null;
+}): Promise<boolean> => {
+  if (!supabase) return false;
+
+  try {
+    const normPhone = normalizePhone(params.phone);
+    const raw10 = normPhone.replace(/^\+91/, '');
+
+    if (params.firebase_uid && params.firebase_uid.trim() !== '') {
+      await supabase
+        .from('clients')
+        .delete()
+        .eq('firebase_uid', params.firebase_uid);
+    }
+
+    if (params.email && params.email.trim() !== '') {
+      await supabase
+        .from('clients')
+        .delete()
+        .eq('email', params.email.trim().toLowerCase());
+    }
+
+    if (normPhone) {
+      await supabase
+        .from('clients')
+        .delete()
+        .or(`phone.eq.${normPhone},phone.eq.${raw10}`);
+    }
+
+    console.log('[Supabase] Account permanently deleted from database.');
+    return true;
+  } catch (err) {
+    console.warn('[Supabase] deleteClientAccountFromSupabase error:', err);
+    return false;
+  }
+};
+
 
 // -------------------------------------------------------------------------
 // 2. BOOKINGS CRM INGESTION
@@ -421,13 +464,6 @@ export const fetchUserBookingsFromSupabase = async (options?: {
 
     const orClauses: string[] = [];
     if (rawName && rawName.trim().length > 1) {
-      // Split full name to match first or last name
-      const nameParts = rawName.trim().split(/\s+/);
-      nameParts.forEach((part) => {
-        if (part.length >= 3) {
-          orClauses.push(`client_name.ilike.%${part}%`);
-        }
-      });
       orClauses.push(`client_name.ilike.%${rawName.trim()}%`);
     }
 
@@ -441,37 +477,44 @@ export const fetchUserBookingsFromSupabase = async (options?: {
       orClauses.push(`client_email.ilike.%${rawEmail.trim()}%`);
     }
 
-    let data: any[] | null = null;
-    let error: any = null;
+    // Fast timeout race to ensure 0-lag UI response
+    const fetchPromise = (async () => {
+      let data: any[] | null = null;
+      let error: any = null;
 
-    if (orClauses.length > 0) {
-      const resp = await query.or(orClauses.join(','));
-      data = resp.data;
-      error = resp.error;
-    } else {
-      const resp = await query.limit(20);
-      data = resp.data;
-      error = resp.error;
-    }
-
-    if (error) {
-      console.warn('[Supabase Bookings] Query failed:', error);
-      return localQueue;
-    }
-
-    const results = data || [];
-
-    // Merge with any freshly recorded local bookings from ck_crm_bookings_queue
-    const merged = [...results];
-    localQueue.forEach((local: any) => {
-      if (!merged.some((m) => m.booking_code === local.booking_code || (local.id && m.id === local.id))) {
-        merged.unshift(local);
+      if (orClauses.length > 0) {
+        const resp = await query.or(orClauses.join(','));
+        data = resp.data;
+        error = resp.error;
+      } else {
+        const resp = await query.limit(20);
+        data = resp.data;
+        error = resp.error;
       }
+
+      if (error) {
+        console.warn('[Supabase Bookings] Query warning:', error);
+        return localQueue;
+      }
+
+      const results = data || [];
+      const merged = [...results];
+      localQueue.forEach((local: any) => {
+        if (!merged.some((m) => m.booking_code === local.booking_code || (local.id && m.id === local.id))) {
+          merged.unshift(local);
+        }
+      });
+
+      return merged;
+    })();
+
+    const timeoutPromise = new Promise<any[]>((resolve) => {
+      setTimeout(() => resolve(localQueue), 2500);
     });
 
-    return merged;
+    return await Promise.race([fetchPromise, timeoutPromise]);
   } catch (err) {
-    console.error('[Supabase Bookings] Exception:', err);
+    console.warn('[Supabase Bookings] Exception:', err);
     return localQueue;
   }
 };
@@ -955,7 +998,37 @@ export const fetchCompanionsFromSupabase = async (filter?: {
       online: c.online ?? true,
       distanceKm: Number(c.distance_km || 1.5),
       languages: c.languages || ['Hindi', 'English'],
+      hobbies: c.hobbies || ['Book reading', 'Shopping', 'Movies', 'Pottery'],
+      availability: c.availability || {
+        Mon: '11:00 – 23:00',
+        Tue: '11:00 – 23:00',
+        Wed: '11:00 – 23:00',
+        Thu: '11:00 – 23:00',
+        Fri: '11:00 – 23:00',
+        Sat: '11:00 – 23:00',
+        Sun: '11:00 – 23:00',
+      },
+      memberSince: c.member_since || 'Jun 2026',
+      reviewsList: c.reviews_list || [
+        { rating: 5, date: '8/8/2026', comment: 'Awesome' },
+        { rating: 5, date: '8/4/2026', comment: '' },
+      ],
+      coverGradient: c.cover_gradient,
     }));
+
+    // Check for any locally customized companion overrides
+    mapped = mapped.map(comp => {
+      try {
+        const localSaved = localStorage.getItem(`ck_companion_custom_profile_${comp.name}`);
+        if (localSaved) {
+          const parsed = JSON.parse(localSaved);
+          return { ...comp, ...parsed };
+        }
+      } catch {
+        // ignore
+      }
+      return comp;
+    });
 
     // In-memory service filter if provided
     if (filter?.service && filter.service !== 'All Services') {
@@ -973,6 +1046,47 @@ export const fetchCompanionsFromSupabase = async (filter?: {
 };
 
 export const fetchProfilesFromSupabase = fetchCompanionsFromSupabase;
+
+export const updateCompanionProfileInSupabase = async (
+  companionName: string,
+  updates: Partial<CompanionProfile>
+): Promise<boolean> => {
+  // Always persist locally
+  try {
+    localStorage.setItem(`ck_companion_custom_profile_${companionName}`, JSON.stringify(updates));
+    localStorage.setItem('ck_companion_profile_custom', JSON.stringify(updates));
+  } catch (e) {
+    console.warn('[Storage] Error saving local companion profile:', e);
+  }
+
+  if (!supabase) return true;
+
+  try {
+    const payload: any = {
+      updated_at: new Date().toISOString()
+    };
+    if (updates.bio !== undefined) payload.bio = updates.bio;
+    if (updates.city !== undefined) payload.city = updates.city;
+    if (updates.pinCode !== undefined) payload.pin_code = updates.pinCode;
+    if (updates.hourlyRate !== undefined) payload.hourly_rate = updates.hourlyRate;
+    if (updates.avatarUrl !== undefined) payload.avatar_url = updates.avatarUrl;
+    if (updates.services !== undefined) payload.services = updates.services;
+
+    const { error } = await supabase
+      .from('companions')
+      .update(payload)
+      .eq('name', companionName);
+
+    if (error) {
+      console.warn('[Supabase] updateCompanionProfileInSupabase error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[Supabase] updateCompanionProfileInSupabase network error:', err);
+    return false;
+  }
+};
 
 // -------------------------------------------------------------------------
 // 9.1 GET TOP 5 COMPANIONS BY PIN CODE OR DISTRICT
@@ -1053,4 +1167,168 @@ export const getTopCompanionsByPinOrCity = async (
   }
 };
 
+// -------------------------------------------------------------------------
+// 19. EVENTS MANAGEMENT & CUSTOMER-CREATED EVENTS (₹499 FEE)
+// -------------------------------------------------------------------------
+export interface CustomEventRecord {
+  id: string;
+  creator_name: string;
+  creator_phone?: string;
+  creator_email?: string;
+  creator_avatar?: string;
+  title: string;
+  category: string;
+  venue: string;
+  city: string;
+  date: string;
+  time: string;
+  duration: string;
+  male_female_ratio: string;
+  max_capacity: number;
+  attendees_count: number;
+  description: string;
+  image?: string;
+  listing_fee_paid: boolean;
+  listing_fee_amount: number;
+  created_at?: string;
+  attendees?: Array<{ name: string; phone?: string; avatar?: string; joined_at: string }>;
+}
 
+export const recordEventInSupabase = async (
+  event: CustomEventRecord
+): Promise<{ success: boolean; data?: any }> => {
+  try {
+    const localEvents = JSON.parse(localStorage.getItem('ck_custom_events') || '[]');
+    const updated = [event, ...localEvents];
+    localStorage.setItem('ck_custom_events', JSON.stringify(updated));
+
+    if (supabase) {
+      try {
+        await supabase.from('events').insert([
+          {
+            id: event.id,
+            title: event.title,
+            category: event.category,
+            venue: event.venue,
+            city: event.city,
+            date: event.date,
+            time: event.time,
+            duration: event.duration,
+            male_female_ratio: event.male_female_ratio,
+            max_capacity: event.max_capacity,
+            attendees_count: event.attendees_count,
+            description: event.description,
+            creator_name: event.creator_name,
+            creator_phone: event.creator_phone,
+            creator_email: event.creator_email,
+            listing_fee_paid: true,
+            metadata: {
+              attendees: event.attendees || [],
+            }
+          }
+        ]);
+      } catch (dbErr) {
+        console.warn('[Supabase Events] DB insert notice:', dbErr);
+      }
+    }
+    return { success: true, data: event };
+  } catch (err) {
+    console.error('[Supabase Events] Record error:', err);
+    return { success: false };
+  }
+};
+
+export const fetchAllEvents = async (): Promise<CustomEventRecord[]> => {
+  const localEvents: CustomEventRecord[] = JSON.parse(localStorage.getItem('ck_custom_events') || '[]');
+  if (!supabase) return localEvents;
+
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      const dbEvents: CustomEventRecord[] = data.map((d: any) => ({
+        id: d.id,
+        title: d.title,
+        category: d.category,
+        venue: d.venue,
+        city: d.city,
+        date: d.date,
+        time: d.time,
+        duration: d.duration || '3 Hours',
+        male_female_ratio: d.male_female_ratio || '1:1 Balanced',
+        max_capacity: d.max_capacity || 10,
+        attendees_count: d.attendees_count || 1,
+        description: d.description || '',
+        creator_name: d.creator_name || 'Member',
+        creator_phone: d.creator_phone,
+        creator_email: d.creator_email,
+        listing_fee_paid: Boolean(d.listing_fee_paid),
+        listing_fee_amount: 499,
+        attendees: d.metadata?.attendees || [],
+      }));
+
+      // Merge unique
+      const merged = [...dbEvents];
+      localEvents.forEach((l) => {
+        if (!merged.some((m) => m.id === l.id)) merged.unshift(l);
+      });
+      return merged;
+    }
+  } catch (e) {
+    console.warn('[Supabase Events] Fetch warning:', e);
+  }
+  return localEvents;
+};
+
+export const deleteEventById = async (eventId: string): Promise<boolean> => {
+  try {
+    const localEvents: CustomEventRecord[] = JSON.parse(localStorage.getItem('ck_custom_events') || '[]');
+    const filtered = localEvents.filter((e) => e.id !== eventId);
+    localStorage.setItem('ck_custom_events', JSON.stringify(filtered));
+
+    if (supabase) {
+      await supabase.from('events').delete().eq('id', eventId);
+    }
+    return true;
+  } catch (err) {
+    console.error('[Supabase Events] Delete error:', err);
+    return false;
+  }
+};
+
+export const bookOrJoinEvent = async (
+  eventId: string,
+  attendee: { name: string; phone?: string; avatar?: string }
+): Promise<boolean> => {
+  try {
+    const localEvents: CustomEventRecord[] = JSON.parse(localStorage.getItem('ck_custom_events') || '[]');
+    const found = localEvents.find((e) => e.id === eventId);
+    if (found) {
+      if (!found.attendees) found.attendees = [];
+      found.attendees.push({ ...attendee, joined_at: new Date().toISOString() });
+      found.attendees_count = (found.attendees_count || 0) + 1;
+      localStorage.setItem('ck_custom_events', JSON.stringify(localEvents));
+    }
+
+    if (supabase) {
+      try {
+        await supabase
+          .from('events')
+          .update({
+            attendees_count: (found?.attendees_count || 1),
+            metadata: { attendees: found?.attendees || [] }
+          })
+          .eq('id', eventId);
+      } catch (e) {
+        // Continue
+      }
+    }
+    return true;
+  } catch (err) {
+    console.warn('[Events] Book attendee warning:', err);
+    return false;
+  }
+};

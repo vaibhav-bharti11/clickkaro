@@ -19,13 +19,14 @@ import { MyServicesPage } from './components/MyServicesPage';
 import { SeekerDashboard } from './components/SeekerDashboard';
 import { CompanionDashboard } from './components/CompanionDashboard';
 import { BuyServicesModal } from './components/BuyServicesModal';
+import { AboutUsPage } from './components/AboutUsPage';
 import { ServiceItem, UserRole, CompanionProfile, BookingContext, ServiceCredit } from './types';
 import { ALL_SERVICES } from './data/servicesData';
 import { subscribeToAuthChanges } from './services/firebase';
 import { CmsProvider, useCms } from './context/CmsContext';
 import { AdminCmsModal } from './components/AdminCmsModal';
 
-export type AppView = 'landing' | 'dashboard' | 'seeker' | 'companion' | 'my-services';
+export type AppView = 'landing' | 'dashboard' | 'seeker' | 'companion' | 'my-services' | 'about-us';
 
 const DEFAULT_AVAILABLE_CREDITS: ServiceCredit[] = [
   {
@@ -304,6 +305,7 @@ const AppContent: React.FC = () => {
           onOpenPartnerJoin={handleOpenPartnerJoin}
           onOpenSearch={handleOpenSearchModal}
           onOpenAuth={handleOpenAuth}
+          onOpenAboutUs={() => { setCurrentView('about-us'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           currentRole={userRole || undefined}
           userName={userName || undefined}
           userAvatar={userAvatar}
@@ -311,6 +313,18 @@ const AppContent: React.FC = () => {
           onLogout={handleLogout}
           currentView={currentView}
           onSwitchMode={handleSwitchMode}
+        />
+      )}
+
+      {/* VIEW: ABOUT US DEDICATED PAGE */}
+      {currentView === 'about-us' && (
+        <AboutUsPage 
+          onBack={() => { setCurrentView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onExploreCompanions={() => {
+            if (isLoggedIn) setCurrentView('seeker');
+            else setCurrentView('landing');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         />
       )}
 
@@ -461,6 +475,10 @@ const AppContent: React.FC = () => {
             else setCurrentView('seeker');
           }}
           onOpenPartnerJoin={handleOpenPartnerJoin}
+          onOpenAboutUs={() => {
+            setCurrentView('about-us');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         />
       )}
 

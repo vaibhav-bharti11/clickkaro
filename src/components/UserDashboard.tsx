@@ -27,7 +27,7 @@ import { TransactionsModal } from './TransactionsModal';
 import { ThreeMonthPassModal } from './ThreeMonthPassModal';
 import { LegalPolicyModal } from './LegalPolicyModal';
 import { UpcomingEventsModal, EventItem } from './UpcomingEventsModal';
-import { saveClientToSupabase } from '../services/supabase';
+import { saveClientToSupabase, deleteClientAccountFromSupabase } from '../services/supabase';
 
 interface UserDashboardProps {
   userName: string;
@@ -1145,12 +1145,20 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
+                  const phone = localStorage.getItem('ck_user_phone');
+                  const email = localStorage.getItem('ck_user_email');
+                  const firebaseUid = localStorage.getItem('ck_firebase_uid');
+                  try {
+                    await deleteClientAccountFromSupabase({ phone, email, firebase_uid: firebaseUid });
+                  } catch (e) {
+                    console.warn('[DeleteAccount] Supabase wipe notice:', e);
+                  }
                   localStorage.clear();
                   setDeleteAccountModal(false);
                   if (onLogout) onLogout();
                 }}
-                className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm"
+                className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm cursor-pointer"
               >
                 Yes, Delete
               </button>

@@ -240,4 +240,43 @@ CREATE POLICY "Allow public update cms_content" ON public.cms_content FOR UPDATE
 DROP POLICY IF EXISTS "Allow public delete cms_content" ON public.cms_content;
 CREATE POLICY "Allow public delete cms_content" ON public.cms_content FOR DELETE USING (true);
 
+-- -------------------------------------------------------------------------
+-- EVENTS TABLE (CUSTOMER-CREATED & ADMIN-MANAGED EVENTS)
+-- -------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.events (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  category TEXT NOT NULL,
+  venue TEXT NOT NULL,
+  city TEXT NOT NULL,
+  date TEXT NOT NULL,
+  time TEXT NOT NULL,
+  duration TEXT DEFAULT '3 Hours',
+  male_female_ratio TEXT DEFAULT '1:1 Balanced',
+  max_capacity INTEGER DEFAULT 10,
+  attendees_count INTEGER DEFAULT 1,
+  description TEXT,
+  creator_name TEXT NOT NULL,
+  creator_phone TEXT,
+  creator_email TEXT,
+  listing_fee_paid BOOLEAN DEFAULT true,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW())
+);
+
+ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read events" ON public.events;
+CREATE POLICY "Allow public read events" ON public.events FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert events" ON public.events;
+CREATE POLICY "Allow public insert events" ON public.events FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public update events" ON public.events;
+CREATE POLICY "Allow public update events" ON public.events FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Allow public delete events" ON public.events;
+CREATE POLICY "Allow public delete events" ON public.events FOR DELETE USING (true);
+
+
 

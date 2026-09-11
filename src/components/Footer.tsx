@@ -6,15 +6,16 @@ import { useCms } from '../context/CmsContext';
 interface FooterProps {
   onOpenBooking: () => void;
   onOpenPartnerJoin: () => void;
+  onOpenAboutUs?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin }) => {
+export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin, onOpenAboutUs }) => {
   const { content, setIsLoginModalOpen, setIsCmsModalOpen, isAdminLoggedIn } = useCms();
   const footerCms = content.footer;
 
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [legalModalOpen, setLegalModalOpen] = useState(false);
-  const [legalTab, setLegalTab] = useState<'privacy' | 'refund' | 'terms'>('privacy');
+  const [legalTab, setLegalTab] = useState<'privacy' | 'refund' | 'conduct' | 'grievance'>('conduct');
 
   useEffect(() => {
     const handleScroll = () => {
@@ -28,7 +29,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const openLegal = (tab: 'privacy' | 'refund' | 'terms') => {
+  const openLegal = (tab: 'privacy' | 'refund' | 'conduct' | 'grievance') => {
     setLegalTab(tab);
     setLegalModalOpen(true);
   };
@@ -41,7 +42,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
           {/* Top Legal Disclaimer */}
           <div className="pb-8 mb-8 border-b border-pink-200/50 text-[11px] leading-relaxed text-[#1d1d1f]/70">
             <p className="mb-2">
-              {footerCms.legalDisclaimer || `* Click Karo Date Karo is strictly a professional social companionship, lifestyle support, and daily care platform operated by ${footerCms.parentCompany}. All interactions strictly follow our consent-first rules and professional code of conduct under the Information Technology Act, 2000. We do not provide dating, matrimonial, or adult escort services.`}
+              {footerCms.legalDisclaimer || `* Click Karo Date Karo is strictly a professional social companionship, lifestyle support, and daily care platform operated by ${footerCms.parentCompany || 'Amber Ventures (OPC) Pvt Ltd'}. All interactions strictly follow our consent-first rules and professional code of conduct under the Information Technology Act, 2000. We do not provide dating, matrimonial, or adult escort services.`}
             </p>
             <p>
               ** Earnings calculations are estimates based on standard partner hourly rates and weekly active bookings. Individual earnings may vary based on city, availability, and client reviews.
@@ -105,15 +106,23 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
               <h4 className="text-[#1d1d1f] font-bold text-xs tracking-tight">
                 Company &amp; Legal
               </h4>
-              <a href="#trust-blueprint" className="hover:text-[#0071e3] transition">About Us</a>
-              <button onClick={() => openLegal('privacy')} className="hover:text-[#0071e3] transition text-left text-xs cursor-pointer">
-                Privacy Policy (IT Act, 2000)
+              <button 
+                onClick={() => onOpenAboutUs ? onOpenAboutUs() : openLegal('conduct')} 
+                className="hover:text-[#0071e3] transition text-left text-xs cursor-pointer font-medium"
+              >
+                About Us
               </button>
-              <button onClick={() => openLegal('terms')} className="hover:text-[#0071e3] transition text-left text-xs cursor-pointer">
-                Terms of Service
+              <button onClick={() => openLegal('conduct')} className="hover:text-[#0071e3] transition text-left text-xs cursor-pointer font-semibold text-[#1d1d1f]">
+                Code of Conduct
+              </button>
+              <button onClick={() => openLegal('privacy')} className="hover:text-[#0071e3] transition text-left text-xs cursor-pointer">
+                Privacy Policy (DPDP 2023)
               </button>
               <button onClick={() => openLegal('refund')} className="hover:text-[#0071e3] transition text-left text-xs cursor-pointer text-emerald-700 font-semibold">
                 100% Refund Policy
+              </button>
+              <button onClick={() => openLegal('grievance')} className="hover:text-[#0071e3] transition text-left text-xs cursor-pointer text-[#0071e3]">
+                Grievance Redressal
               </button>
             </div>
 
@@ -124,8 +133,8 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking, onOpenPartnerJoin
               </h4>
               <a href="#faq" className="hover:text-[#0071e3] transition">Help Center</a>
               <a href="#faq" className="hover:text-[#0071e3] transition">24/7 Safety SOS</a>
-              <span className="text-[11px] text-[#86868b] mt-1">{footerCms.grievanceEmail || 'grievance@kopartner.in'}</span>
-              <span className="text-[11px] text-[#86868b]">{footerCms.dpoEmail || 'dpo@kopartner.in'}</span>
+              <span className="text-[11px] text-[#86868b] mt-1">{footerCms.grievanceEmail || 'grievance@clickkarodatekaro.com'}</span>
+              <span className="text-[11px] text-[#86868b]">{footerCms.dpoEmail || 'dpo@clickkarodatekaro.com'}</span>
               
               <button
                 onClick={() => isAdminLoggedIn ? setIsCmsModalOpen(true) : setIsLoginModalOpen(true)}

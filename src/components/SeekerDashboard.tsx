@@ -19,15 +19,18 @@ import {
   Receipt,
   ArrowRight,
   Sparkles,
-  Clock
+  Clock,
+  ShieldCheck,
+  Lock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { fetchCompanionsFromSupabase, recordBookingInSupabase } from '../services/supabase';
+import { fetchCompanionsFromSupabase, recordBookingInSupabase, deleteClientAccountFromSupabase } from '../services/supabase';
 import { MyBookingsModal } from './MyBookingsModal';
 import { TransactionsModal } from './TransactionsModal';
 import { ThreeMonthPassModal } from './ThreeMonthPassModal';
 import { LegalPolicyModal } from './LegalPolicyModal';
 import { UpcomingEventsModal, EventItem } from './UpcomingEventsModal';
+import { CompanionProfileView } from './CompanionProfileView';
 
 interface SeekerDashboardProps {
   userName: string;
@@ -46,6 +49,47 @@ interface SeekerDashboardProps {
 
 // Expanded mock list for companion grid to match Image 3 aesthetics
 const ADDITIONAL_COMPANIONS: CompanionProfile[] = [
+  {
+    id: 'comp-akshita',
+    name: 'Akshita Bhutra',
+    age: 24,
+    city: 'Mumbai',
+    pinCode: '400050',
+    rating: 5.00,
+    reviewCount: 2,
+    hourlyRate: 1999,
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
+    badges: ['Face Verified', 'Top Rated Companion', '100% KYC'],
+    bio: 'Easygoing, ambitious, and always up for meaningful conversations. I value honesty, kindness, and mutual respect. Looking to connect with someone who enjoys good company, laughter, and building something real together.',
+    verifiedKYC: true,
+    online: false,
+    distanceKm: 2.5,
+    languages: ['Hindi', 'English', 'Marathi'],
+    services: [
+      'Hangout',
+      'Movie Partner',
+      'Clubbing',
+      'Lunch/Dinner',
+      'Travel Partner',
+      'Coffee Partner',
+    ],
+    hobbies: ['Book reading', 'Shopping', 'Movies', 'Pottery'],
+    availability: {
+      Mon: '11:00 – 23:00',
+      Tue: '11:00 – 23:00',
+      Wed: '11:00 – 23:00',
+      Thu: '11:00 – 23:00',
+      Fri: '11:00 – 23:00',
+      Sat: '11:00 – 23:00',
+      Sun: '11:00 – 23:00',
+    },
+    memberSince: 'Jun 2026',
+    reviewsList: [
+      { rating: 5, date: '8/8/2026', comment: 'Awesome' },
+      { rating: 5, date: '8/4/2026', comment: '' },
+    ],
+    coverGradient: 'bg-gradient-to-r from-[#9333EA] via-[#D946EF] to-[#EC4899]',
+  },
   {
     id: 'comp-roshni',
     name: 'Roshni Punjabi',
@@ -190,6 +234,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
   const [legalTab, setLegalTab] = useState<'privacy' | 'refund' | 'terms'>('privacy');
   const [eventsModalOpen, setEventsModalOpen] = useState(false);
   const [deleteAccountModal, setDeleteAccountModal] = useState(false);
+  const [serviceMismatchAlert, setServiceMismatchAlert] = useState<{ compName: string; requiredService: string } | null>(null);
 
   // Booking Date & Time selection states (Requested by user)
   const [bookingDate, setBookingDate] = useState(() => {
@@ -200,6 +245,34 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
   const [bookingTimeSlot, setBookingTimeSlot] = useState('06:00 PM');
   const [customTime, setCustomTime] = useState('');
   const [bookingHours, setBookingHours] = useState(4);
+  const [selectedCreditId, setSelectedCreditId] = useState<string>('');
+
+  // Helper to determine exact service duration in hours from credit
+  const getCreditDurationHours = (credit?: ServiceCredit | null): number => {
+    if (!credit) return 4;
+    const sId = (credit.serviceId || '').toLowerCase();
+    const title = (credit.displayTitle || credit.serviceName || '').toLowerCase();
+    
+    if (sId.includes('travel') || sId.includes('tour') || title.includes('12 hour')) return 12;
+    if (sId.includes('club') || sId.includes('night') || title.includes('6 hour')) return 6;
+    if (sId.includes('hangout') || sId.includes('movie') || title.includes('4 hour')) return 4;
+    if (sId.includes('lunch') || sId.includes('dinner') || title.includes('2 hour')) return 2;
+    if (sId.includes('coffee') || sId.includes('cafe') || sId.includes('quick') || title.includes('1 hour')) return 1;
+    
+    const match = title.match(/(\d+)\s*hour/i);
+    if (match) return parseInt(match[1], 10);
+    return 4;
+  };
+
+  const currentCredit = (selectedCreditId 
+    ? availableCredits.find(c => c.id === selectedCreditId) 
+    : null) || activeCredit || (availableCredits && availableCredits.length > 0 ? availableCredits[0] : null);
+
+  useEffect(() => {
+    if (currentCredit) {
+      setBookingHours(getCreditDurationHours(currentCredit));
+    }
+  }, [currentCredit]);
 
   const [companions, setCompanions] = useState<CompanionProfile[]>(MOCK_COMPANIONS);
   const [_loadingCompanions, setLoadingCompanions] = useState(false);
@@ -221,7 +294,9 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
     fetchCompanionsFromSupabase().then((data) => {
       if (isMounted) {
         if (data && data.length > 0) {
-          setCompanions(data);
+          const existingNames = new Set(data.map(d => d.name.toLowerCase()));
+          const extra = ADDITIONAL_COMPANIONS.filter(a => !existingNames.has(a.name.toLowerCase()));
+          setCompanions([...extra, ...data]);
         } else {
           setCompanions([...ADDITIONAL_COMPANIONS, ...MOCK_COMPANIONS]);
         }
@@ -252,7 +327,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
     });
   }, [companions, filterName, filterCity, filterService, filterGender]);
 
-  // Click on companion card "Book" button -> opens the requested "Confirm booking Yes / No" popup
+  // Click on companion card "Book" button -> enforce service lock if user recharged for a specific service
   const handleBookClick = (companion: CompanionProfile) => {
     const hasCredit = Boolean(activeCredit) || (availableCredits && availableCredits.length > 0);
     if (!hasCredit) {
@@ -261,6 +336,27 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
       }
       return;
     }
+
+    const targetCredit = currentCredit;
+    if (targetCredit) {
+      const requiredId = (targetCredit.serviceId || 'hangout').toLowerCase().replace(/\s+/g, '-');
+      const compServices = (companion.services || []).map((s) => s.toLowerCase().replace(/\s+/g, '-'));
+      
+      // Strict rule: When recharged for Hangout (or any service), companion must offer that service!
+      const offersService = compServices.some(s => s === requiredId || s.includes(requiredId) || requiredId.includes(s));
+      if (!offersService) {
+        setServiceMismatchAlert({
+          compName: companion.name,
+          requiredService: targetCredit.displayTitle || targetCredit.serviceName,
+        });
+        return;
+      }
+
+      // Strictly set bookingHours to the recharged service duration
+      const hours = getCreditDurationHours(targetCredit);
+      setBookingHours(hours);
+    }
+
     setConfirmingCompanion(companion);
   };
 
@@ -269,7 +365,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
     if (!confirmingCompanion) return;
     
     // Strict credit validation: cannot book without an active or available credit
-    const targetCredit = activeCredit || (availableCredits && availableCredits.length > 0 ? availableCredits[0] : null);
+    const targetCredit = currentCredit;
     if (!targetCredit) {
       setConfirmingCompanion(null);
       if (onOpenBuyServices) onOpenBuyServices();
@@ -282,6 +378,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
     const bookingCode = `CK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     const selectedTime = customTime.trim() || bookingTimeSlot;
     const fullDateTime = `${bookingDate} at ${selectedTime}`;
+    const hours = getCreditDurationHours(targetCredit);
 
     // 1. Ingest booking directly to Supabase bookings table
     try {
@@ -294,11 +391,11 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
         city: comp.city,
         pin_code: comp.pinCode,
         booking_date: fullDateTime,
-        hours: bookingHours,
+        hours: hours,
         total_price: targetCredit.priceNum || 1770,
         companion_name: comp.name,
         companion_avatar: comp.avatarUrl,
-        concierge_notes: `Booking Code: ${bookingCode} | Scheduled: ${fullDateTime} (${bookingHours} Hours)`,
+        concierge_notes: `Booking Code: ${bookingCode} | Scheduled: ${fullDateTime} (${hours} Hours - ${targetCredit.displayTitle || targetCredit.serviceName})`,
       });
     } catch (err) {
       console.warn('[SeekerDashboard] Record booking Supabase notice:', err);
@@ -507,8 +604,23 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
         </div>
       </header>
 
-      {/* 2. BODY CONTENT */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 space-y-6">
+      {/* 2. BODY CONTENT: FULL PROFILE VIEW OR BROWSE COMPANIONS FEED */}
+      {selectedProfile ? (
+        <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 pb-20">
+          <CompanionProfileView
+            companion={selectedProfile}
+            onBack={() => setSelectedProfile(null)}
+            onBook={(comp) => {
+              setSelectedProfile(null);
+              handleBookClick(comp);
+            }}
+            isSeeker={true}
+            activeCredit={activeCredit}
+            availableCredits={availableCredits}
+          />
+        </main>
+      ) : (
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 space-y-6">
         
         {/* Title & Description */}
         <div>
@@ -693,6 +805,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
         </div>
 
       </main>
+      )}
 
       {/* POPUP 1: CONFIRM THE BOOKING? YES / NO (Includes Booking Date and Time Selection) */}
       {confirmingCompanion && (
@@ -727,8 +840,8 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
                   <span className="text-[#6B7280] font-normal">&bull; {confirmingCompanion.city}</span>
                 </div>
                 {Boolean(activeCredit) || (availableCredits && availableCredits.length > 0) ? (
-                  <div className="text-[11px] text-[#FF2D55] font-bold mt-1">
-                    Redeeming: <span className="underline">{activeCredit ? (activeCredit.displayTitle || activeCredit.serviceName) : availableCredits[0]?.displayTitle}</span>
+                  <div className="text-[11px] text-[#FF2D55] font-bold mt-1 bg-pink-50/80 px-2.5 py-1 rounded-lg border border-pink-200">
+                    🔒 Locked Service: <span className="underline">{currentCredit ? (currentCredit.displayTitle || currentCredit.serviceName) : availableCredits[0]?.displayTitle}</span>
                   </div>
                 ) : (
                   <div className="text-[11px] text-amber-700 font-bold mt-1">
@@ -791,24 +904,74 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
                   />
                 </div>
 
-                {/* 3. Duration Selector */}
+                {/* 3. Authorized Recharged Service Package (Strictly locked - other services cannot be selected) */}
                 <div>
-                  <label className="block text-xs font-bold text-[#111827] mb-1 font-sans">
-                    Session Duration
-                  </label>
-                  <select
-                    value={bookingHours}
-                    onChange={(e) => setBookingHours(Number(e.target.value))}
-                    className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#FF2D55]"
-                  >
-                    <option value={1}>1 Hour Session (Cafe / Quick Dialogue)</option>
-                    <option value={2}>2 Hours Session (Lunch / Dinner)</option>
-                    <option value={4}>4 Hours Session (Movie / Hangout Package)</option>
-                    <option value={6}>6 Hours Session (Clubbing / Nightlife)</option>
-                    <option value={12}>12 Hours Session (Full Day City Tour)</option>
-                  </select>
-                </div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-[#111827] font-sans flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-[#FF2D55]" />
+                      <span>Authorized Service Package</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Locked to Recharge
+                    </span>
+                  </div>
 
+                  {/* If user has multiple available credits, allow picking which purchased credit to use */}
+                  {availableCredits && availableCredits.length > 1 && (
+                    <div className="mb-2.5">
+                      <label className="text-[11px] font-semibold text-stone-600 mb-1 block">
+                        Select from your purchased recharges:
+                      </label>
+                      <select
+                        value={selectedCreditId || currentCredit?.id}
+                        onChange={(e) => {
+                          const newId = e.target.value;
+                          setSelectedCreditId(newId);
+                          const cred = availableCredits.find(c => c.id === newId);
+                          if (cred) {
+                            setBookingHours(getCreditDurationHours(cred));
+                          }
+                        }}
+                        className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#FF2D55]"
+                      >
+                        {availableCredits.map((cred) => (
+                          <option key={cred.id} value={cred.id}>
+                            {cred.displayTitle || cred.serviceName} ({cred.price || 'Active'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Single Locked Service Display - NO OTHER SERVICES ARE SELECTABLE */}
+                  <div className="bg-gradient-to-r from-pink-50/70 via-white to-purple-50/50 border-2 border-pink-200 rounded-2xl p-4 shadow-xs">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-pink-100/90 border border-pink-200 flex items-center justify-center text-lg shrink-0">
+                          🎯
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-extrabold text-sm text-[#111827] truncate">
+                            {currentCredit ? (currentCredit.displayTitle || currentCredit.serviceName) : 'Recharged Service'}
+                          </p>
+                          <p className="text-xs text-stone-600 font-medium mt-0.5">
+                            Duration: <span className="font-extrabold text-[#FF2D55]">{bookingHours} {bookingHours === 1 ? 'Hour' : 'Hours'} Session</span> &bull; <span className="text-emerald-700 font-bold">Pre-funded</span>
+                          </p>
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-pink-700 bg-pink-100/70 px-2.5 py-1 rounded-lg border border-pink-200">
+                          <Lock className="w-3 h-3" /> Locked
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-2.5 border-t border-pink-100 flex items-center gap-1.5 text-[11px] text-stone-500 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Other services are locked. You can only book the service tier you recharged for.</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : null}
 
@@ -934,59 +1097,7 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
         </div>
       )}
 
-      {/* QUICK VIEW PROFILE MODAL */}
-      {selectedProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 border border-pink-200 shadow-apple-float space-y-4">
-            <div className="flex items-center gap-4">
-              <img
-                src={selectedProfile.avatarUrl}
-                alt={selectedProfile.name}
-                className="w-16 h-16 rounded-full object-cover ring-2 ring-pink-200"
-              />
-              <div>
-                <h3 className="text-xl font-bold text-[#1d1d1f] flex items-center gap-1.5">
-                  <span>{selectedProfile.name}</span>
-                  <CheckCircle2 className="w-4 h-4 text-[#0071e3]" />
-                </h3>
-                <div className="flex items-center gap-1 text-xs text-[#F59E0B] font-bold">
-                  <Star className="w-3.5 h-3.5 fill-[#F59E0B]" />
-                  <span>{selectedProfile.rating ? selectedProfile.rating.toFixed(2) : '5.00'}</span>
-                  <span className="text-[#86868b] font-normal">({selectedProfile.reviewCount} reviews)</span>
-                </div>
-                <div className="text-xs text-[#86868b] mt-0.5">
-                  📍 {selectedProfile.city} &bull; PIN {selectedProfile.pinCode}
-                </div>
-              </div>
-            </div>
 
-            <div className="p-3.5 rounded-2xl bg-[#fdf8f8] border border-pink-100 text-xs text-[#1d1d1f]/85 leading-relaxed font-sans">
-              {selectedProfile.bio}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setSelectedProfile(null)}
-                className="w-full py-2.5 rounded-xl border border-stone-200 text-stone-600 font-bold text-xs"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const comp = selectedProfile;
-                  setSelectedProfile(null);
-                  handleBookClick(comp);
-                }}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#FF2D55] via-[#E11D48] to-[#9333EA] text-white font-bold text-xs shadow-xs"
-              >
-                Book Companion
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 1. MY BOOKINGS MODAL */}
       <MyBookingsModal
@@ -1024,11 +1135,62 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
       <UpcomingEventsModal
         isOpen={eventsModalOpen}
         onClose={() => setEventsModalOpen(false)}
+        userName={userName}
+        userPhone={userPhone}
         onBookEventPartner={(evt: EventItem) => {
           setEventsModalOpen(false);
           setFilterService(evt.category === 'Concert & Music' ? 'Hangout' : 'All Services');
         }}
       />
+
+      {/* SERVICE RESTRICTION / MISMATCH MODAL */}
+      {serviceMismatchAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in font-sans">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 border border-pink-200 shadow-2xl space-y-4 text-center">
+            <div className="w-14 h-14 rounded-full bg-pink-100 text-[#FF2D55] flex items-center justify-center mx-auto shadow-xs">
+              <ShieldCheck className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-display font-bold text-lg text-[#111827]">
+                Service Credit Restriction
+              </h3>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Your purchased recharge is for <strong className="text-[#FF2D55]">{serviceMismatchAlert.requiredService}</strong>.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 text-xs text-stone-700 text-left space-y-1.5">
+              <p>
+                <strong>{serviceMismatchAlert.compName}</strong> does not offer this specific service.
+              </p>
+              <p className="text-stone-500 text-[11px]">
+                Under Click Karo Date Karo policy, you can only redeem your credit with verified companions who officially provide <strong>{serviceMismatchAlert.requiredService}</strong>.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setServiceMismatchAlert(null)}
+                className="w-full py-2.5 rounded-xl border border-stone-300 text-stone-700 font-bold text-xs hover:bg-stone-100 transition cursor-pointer"
+              >
+                Choose Another
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setServiceMismatchAlert(null);
+                  if (onOpenBuyServices) onOpenBuyServices();
+                }}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#FF2D55] to-[#E11D48] text-white font-bold text-xs shadow-xs hover:opacity-95 transition cursor-pointer"
+              >
+                Buy Service Pass
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 6. DELETE ACCOUNT CONFIRMATION MODAL */}
       {deleteAccountModal && (
@@ -1058,12 +1220,20 @@ export const SeekerDashboard: React.FC<SeekerDashboardProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
+                  const phone = localStorage.getItem('ck_user_phone');
+                  const email = localStorage.getItem('ck_user_email');
+                  const firebaseUid = localStorage.getItem('ck_firebase_uid');
+                  try {
+                    await deleteClientAccountFromSupabase({ phone, email, firebase_uid: firebaseUid });
+                  } catch (e) {
+                    console.warn('[DeleteAccount] Supabase wipe notice:', e);
+                  }
                   localStorage.clear();
                   setDeleteAccountModal(false);
                   if (onLogout) onLogout();
                 }}
-                className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm"
+                className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm cursor-pointer"
               >
                 Yes, Delete
               </button>

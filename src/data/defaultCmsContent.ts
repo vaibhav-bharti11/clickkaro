@@ -25,8 +25,8 @@ export const DEFAULT_CMS_CONTENT: CmsSiteContent = {
   hero: {
     badgeText: 'India’s #1 Lifestyle Partner',
     badgeSubtext: 'Pan-India Availability • Genuine Connections • Privacy-Focused • Professional Support',
-    mainHeadline: 'CLICK • CONNECT • MEETUP',
-    highlightWords: ['CLICK', 'CONNECT', 'MEETUP'],
+    mainHeadline: 'CLICK • CONNECT • MEET',
+    highlightWords: ['CLICK', 'CONNECT', 'MEET'],
     subheadline: 'Meet genuine people, enjoy good conversations and make every moment more social. Click Karo Date Karo makes it easy to connect with someone for coffee, lunch, dinner, hangouts and meetups — all in a safe, respectful and comfortable environment.',
     primaryCtaText: 'FIND A COMPANION',
     secondaryCtaText: 'BECOME A COMPANION',

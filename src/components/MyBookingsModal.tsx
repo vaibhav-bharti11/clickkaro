@@ -22,15 +22,30 @@ export const MyBookingsModal: React.FC<MyBookingsModalProps> = ({
   userPhone,
   userEmail,
 }) => {
-  const [dbBookings, setDbBookings] = useState<any[]>([]);
+  const [dbBookings, setDbBookings] = useState<any[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('ck_crm_bookings_queue') || '[]');
+    } catch {
+      return [];
+    }
+  });
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
 
+    // 1. Instant 0ms local hydration from offline queue and credits
+    try {
+      const local = JSON.parse(localStorage.getItem('ck_crm_bookings_queue') || '[]');
+      if (local && local.length > 0) {
+        setDbBookings(local);
+      }
+    } catch (e) {
+      // Ignore
+    }
+
     let isMounted = true;
     const loadBookings = async () => {
-      setIsLoading(true);
       try {
         const resolvedName = userName || localStorage.getItem('ck_user_name');
         const resolvedPhone = userPhone || localStorage.getItem('ck_user_phone');
@@ -42,7 +57,7 @@ export const MyBookingsModal: React.FC<MyBookingsModalProps> = ({
           email: resolvedEmail,
         });
 
-        if (isMounted && data) {
+        if (isMounted && data && data.length > 0) {
           setDbBookings(data);
         }
       } catch (err) {

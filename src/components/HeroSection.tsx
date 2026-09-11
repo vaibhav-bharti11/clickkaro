@@ -198,7 +198,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
           {/* Bold Core Headline */}
           <h1 className="font-display font-black text-[#09090b] text-4xl sm:text-6xl md:text-7xl lg:text-8xl leading-[1.04] tracking-[-0.035em] mb-4 drop-shadow-[0_2px_8px_rgba(255,255,255,0.9)]">
-            {heroCms.mainHeadline.split('•').map((part, index, arr) => (
+            {(heroCms.mainHeadline || 'CLICK • CONNECT • MEET')
+              .replace(/MEETUP/gi, 'MEET')
+              .split('•')
+              .map((part, index, arr) => (
               <React.Fragment key={index}>
                 {index === 1 ? (
                   <span className="bg-gradient-to-r from-[#FF0055] via-[#E11D48] to-[#8B5CF6] bg-clip-text text-transparent filter drop-shadow-[0_4px_16px_rgba(255,0,85,0.4)]">

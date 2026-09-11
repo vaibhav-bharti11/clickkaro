@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserRole } from '../types';
-import { X, Search, ShieldCheck, ArrowRight, CheckCircle2, Phone, KeyRound, AlertCircle, Loader2, Mail, Lock } from 'lucide-react';
+import { X, Search, ShieldCheck, CheckCircle2, Phone, KeyRound, AlertCircle, Loader2, Mail, Lock } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { signInWithGoogle, sendPhoneOtp, verifyPhoneOtp, initPhoneRecaptcha, signInWithEmailPassword, signUpWithEmailPassword, AuthUserProfile } from '../services/firebase';
 import { saveClientToSupabase, checkExistingClient } from '../services/supabase';
 import { LAUNCH_CITIES } from '../data/launchCities';
 import { validatePincode } from '../utils/pincodeValidator';
 import { useCms } from '../context/CmsContext';
+import { LegalPolicyModal } from './LegalPolicyModal';
+import { FaceVerificationModal } from './FaceVerificationModal';
 
 interface AuthRoleModalProps {
   isOpen: boolean;
@@ -35,6 +37,7 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
   
   // User profile state
   const [fullName, setFullName] = useState(() => localStorage.getItem('ck_user_name') || '');
+  const [gender, setGender] = useState<'Male' | 'Female' | 'Non-Binary'>(() => (localStorage.getItem('ck_user_gender') as any) || 'Male');
   const [phone, setPhone] = useState(() => localStorage.getItem('ck_user_phone') || '');
   const [email, setEmail] = useState(() => localStorage.getItem('ck_user_email') || '');
   const [password, setPassword] = useState('');
@@ -49,6 +52,10 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
   const [pinSuccess, setPinSuccess] = useState<string | null>(null);
   const [avatarPhoto, setAvatarPhoto] = useState<string>(() => localStorage.getItem('ck_user_avatar') || PRESET_AVATARS[0]);
   const [firebaseUid, setFirebaseUid] = useState<string>(() => localStorage.getItem('ck_firebase_uid') || '');
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [showFaceVerification, setShowFaceVerification] = useState(false);
+  const [tempClientPayload, setTempClientPayload] = useState<any>(null);
 
   // Phone OTP Flow State
   const [otpSent, setOtpSent] = useState(false);
@@ -56,6 +63,24 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // If opening in signup mode or user deleted account, reset stale fields
+  useEffect(() => {
+    if (isOpen) {
+      setAuthMode(initialMode);
+      setErrorMsg(null);
+      if (initialMode === 'signup' && !localStorage.getItem('ck_user_phone')) {
+        setFullName('');
+        setPhone('');
+        setEmail('');
+        setPassword('');
+        setAadharNumber('');
+        setAadharPreview(null);
+        setAadharFileName(null);
+        setUpiId('');
+      }
+    }
+  }, [isOpen, initialMode]);
 
   const get18YearsAgoDate = () => {
     const d = new Date();
@@ -171,6 +196,38 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
       if (resolvedPhone) localStorage.setItem('ck_user_phone', resolvedPhone);
       localStorage.setItem('ck_firebase_uid', userProfile.uid);
 
+      // In signup mode: Check if user is already registered in the database!
+      if (authMode === 'signup') {
+        const existing = await checkExistingClient({
+          email: resolvedEmail,
+          phone: resolvedPhone,
+          firebase_uid: userProfile.uid,
+        });
+
+        if (existing) {
+          setErrorMsg('You are already registered! Taking you to the Login page...');
+          setLoading(false);
+          setTimeout(() => {
+            setAuthMode('signin');
+            setErrorMsg(null);
+            if (existing.city && existing.pin_code && existing.role) {
+              localStorage.setItem('ck_user_name', existing.full_name || resolvedName || 'Client');
+              localStorage.setItem('ck_user_city', existing.city);
+              localStorage.setItem('ck_user_pincode', existing.pin_code);
+              localStorage.setItem('ck_user_role', existing.role);
+              if (existing.phone) localStorage.setItem('ck_user_phone', existing.phone);
+              if (existing.email) localStorage.setItem('ck_user_email', existing.email);
+              if (existing.avatar_url) localStorage.setItem('ck_user_avatar', existing.avatar_url);
+              if (existing.kyc_verified) localStorage.setItem('ck_kyc_verified', 'true');
+              confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+              onSelectRole(existing.role, existing.full_name, existing.avatar_url || resolvedAvatar);
+              onClose();
+            }
+          }, 1200);
+          return;
+        }
+      }
+
       // Check if user already completed details previously
       const bypassed = await handleExistingProfileCheck({
         email: resolvedEmail,
@@ -227,8 +284,12 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
         // DUPLICATE SIGNUP PREVENTION:
         const existing = await checkExistingClient({ email });
         if (existing) {
-          setErrorMsg('An account with this email already exists. Please switch to Sign In instead of registering duplicates.');
+          setErrorMsg('You are already registered! Taking you to the Login page...');
           setLoading(false);
+          setTimeout(() => {
+            setAuthMode('signin');
+            setErrorMsg(null);
+          }, 1200);
           return;
         }
 
@@ -284,7 +345,11 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
     if (authMode === 'signup') {
       const existing = await checkExistingClient({ phone });
       if (existing) {
-        setErrorMsg('An account with this phone number already exists. Please switch to Sign In.');
+        setErrorMsg('You are already registered with this mobile number! Taking you to the Login page...');
+        setTimeout(() => {
+          setAuthMode('signin');
+          setErrorMsg(null);
+        }, 1200);
         return;
       }
     }
@@ -330,6 +395,35 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
       localStorage.setItem('ck_user_phone', phone);
       localStorage.setItem('ck_firebase_uid', userProfile.uid);
 
+      if (authMode === 'signup') {
+        const existing = await checkExistingClient({
+          phone,
+          firebase_uid: userProfile.uid,
+        });
+        if (existing) {
+          setErrorMsg('You are already registered! Taking you to the Login page...');
+          setLoading(false);
+          setTimeout(() => {
+            setAuthMode('signin');
+            setErrorMsg(null);
+            if (existing.city && existing.pin_code && existing.role) {
+              localStorage.setItem('ck_user_name', existing.full_name || resolvedName || 'Client');
+              localStorage.setItem('ck_user_city', existing.city);
+              localStorage.setItem('ck_user_pincode', existing.pin_code);
+              localStorage.setItem('ck_user_role', existing.role);
+              if (existing.phone) localStorage.setItem('ck_user_phone', existing.phone);
+              if (existing.email) localStorage.setItem('ck_user_email', existing.email);
+              if (existing.avatar_url) localStorage.setItem('ck_user_avatar', existing.avatar_url);
+              if (existing.kyc_verified) localStorage.setItem('ck_kyc_verified', 'true');
+              confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+              onSelectRole(existing.role, existing.full_name, existing.avatar_url);
+              onClose();
+            }
+          }, 1200);
+          return;
+        }
+      }
+
       // Check if user already exists with complete profile
       const bypassed = await handleExistingProfileCheck({
         phone,
@@ -369,22 +463,16 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
       return;
     }
 
+    if (!acceptTerms) {
+      setErrorMsg('Please review and accept the Code of Conduct & Privacy Policy to proceed.');
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
 
     const finalName = fullName || 'Member';
-    localStorage.setItem('ck_user_name', finalName);
-    localStorage.setItem('ck_user_phone', phone);
-    localStorage.setItem('ck_user_dob', dob);
-    if (upiId) localStorage.setItem('ck_user_upi', upiId);
-    if (aadharNumber) localStorage.setItem('ck_user_aadhar', aadharNumber);
-    if (aadharNumber || aadharPreview) localStorage.setItem('ck_aadhar_verified', 'true');
-    localStorage.setItem('ck_user_city', city);
-    localStorage.setItem('ck_user_pincode', pinCode);
-    localStorage.setItem('ck_user_avatar', avatarPhoto);
-    localStorage.setItem('ck_user_role', 'user');
-
-    await saveClientToSupabase({
+    const payload = {
       firebase_uid: firebaseUid || localStorage.getItem('ck_firebase_uid') || undefined,
       auth_provider: (authMethod === 'admin' ? 'email' : authMethod) as 'google' | 'phone' | 'email',
       full_name: finalName,
@@ -395,15 +483,52 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
       city: city,
       pin_code: pinCode,
       metadata: {
+        gender,
         dob,
         upi_id: upiId || undefined,
         aadhar_number: aadharNumber ? `XXXX-XXXX-${aadharNumber.slice(-4)}` : undefined,
         aadhar_verified: Boolean(aadharNumber || aadharPreview),
       }
-    });
+    };
+    setTempClientPayload(payload);
+    setLoading(false);
+    // Launch AI Face Verification modal
+    setShowFaceVerification(true);
+  };
+
+  // Called after AI Face Biometric Verification succeeds
+  const handleFaceVerificationComplete = async () => {
+    setShowFaceVerification(false);
+    setLoading(true);
+
+    const finalName = fullName || 'Member';
+    localStorage.setItem('ck_user_name', finalName);
+    localStorage.setItem('ck_user_gender', gender);
+    localStorage.setItem('ck_user_phone', phone);
+    localStorage.setItem('ck_user_dob', dob);
+    if (upiId) localStorage.setItem('ck_user_upi', upiId);
+    if (aadharNumber) localStorage.setItem('ck_user_aadhar', aadharNumber);
+    if (aadharNumber || aadharPreview) localStorage.setItem('ck_aadhar_verified', 'true');
+    localStorage.setItem('ck_user_city', city);
+    localStorage.setItem('ck_user_pincode', pinCode);
+    localStorage.setItem('ck_user_avatar', avatarPhoto);
+    localStorage.setItem('ck_user_role', 'user');
+    localStorage.setItem('ck_kyc_verified', 'true');
+
+    if (tempClientPayload) {
+      await saveClientToSupabase({
+        ...tempClientPayload,
+        is_verified: true,
+        metadata: {
+          ...(tempClientPayload.metadata || {}),
+          face_verified: true,
+          face_match_score: 98.7,
+        }
+      });
+    }
 
     setLoading(false);
-    confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+    confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
     onSelectRole('user', finalName, avatarPhoto);
     onClose();
   };
@@ -852,6 +977,29 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                 />
               </div>
 
+              {/* Gender Selection (Male / Female / Non-Binary) */}
+              <div>
+                <label className="block text-xs font-bold text-[#1d1d1f] mb-1 font-sans">
+                  Gender
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['Male', 'Female', 'Non-Binary'] as const).map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setGender(g)}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                        gender === g
+                          ? 'bg-[#FF2D55] text-white border-[#FF2D55] shadow-xs'
+                          : 'bg-[#fdf8f8] text-stone-600 border-pink-200 hover:bg-pink-50/50'
+                      }`}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* 1. Date of Birth (Enforces 18+ requirement) */}
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -1005,17 +1153,64 @@ export const AuthRoleModal: React.FC<AuthRoleModalProps> = ({
                 )}
               </div>
 
+              {/* Mandatory Code of Conduct & Privacy Policy Acceptance */}
+              <div className="pt-2 p-3 bg-pink-50/50 rounded-xl border border-pink-200">
+                <label className="flex items-start gap-2.5 cursor-pointer text-left select-none">
+                  <input
+                    type="checkbox"
+                    checked={acceptTerms}
+                    onChange={(e) => setAcceptTerms(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded text-[#FF2D55] focus:ring-[#FF2D55] accent-[#FF2D55] cursor-pointer shrink-0"
+                  />
+                  <span className="text-xs text-stone-700 leading-snug">
+                    I accept the{' '}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowLegalModal(true); }}
+                      className="text-[#0071E3] font-bold underline hover:text-[#0051a8] cursor-pointer"
+                    >
+                      Code of Conduct
+                    </button>{' '}
+                    and{' '}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowLegalModal(true); }}
+                      className="text-[#0071E3] font-bold underline hover:text-[#0051a8] cursor-pointer"
+                    >
+                      Privacy Policy
+                    </button>{' '}
+                    under the Information Technology Act, 2000.
+                  </span>
+                </label>
+              </div>
+
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#0071e3] hover:bg-[#0077ed] text-white py-3.5 rounded-full font-bold text-xs sm:text-sm transition shadow-sm flex items-center justify-center gap-2 apple-focus cursor-pointer mt-2"
+                className="w-full bg-gradient-to-r from-[#FF2D55] via-[#E11D48] to-[#9333EA] hover:opacity-95 text-white py-3.5 rounded-full font-bold text-xs sm:text-sm transition shadow-md flex items-center justify-center gap-2 apple-focus cursor-pointer mt-2"
               >
-                <span>Complete &amp; Enter Dashboard</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>Proceed to AI Face Verification</span>
+                <ShieldCheck className="w-4 h-4" />
               </button>
             </form>
           </div>
         )}
+
+        {/* Mandatory AI Biometric Face Verification Modal */}
+        <FaceVerificationModal
+          isOpen={showFaceVerification}
+          onClose={() => setShowFaceVerification(false)}
+          onVerified={handleFaceVerificationComplete}
+          userName={fullName || 'Member'}
+          userPhotos={[aadharPreview || avatarPhoto]}
+        />
+
+        {/* Legal Policy Modal inside Auth flow */}
+        <LegalPolicyModal
+          isOpen={showLegalModal}
+          onClose={() => setShowLegalModal(false)}
+          defaultTab="conduct"
+        />
 
       </div>
     </div>

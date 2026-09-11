@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BookingRequest } from '../types';
-import { TrendingUp, CheckCircle2, XCircle, Clock, ShieldCheck, ArrowLeft, Sparkles, MapPin, DollarSign, Calendar, AlertTriangle, LogOut, Camera, Plus, Trash2, Image as ImageIcon, UserCheck, Bell, ShieldAlert, Mail, KeyRound, Lock } from 'lucide-react';
+import { BookingRequest, CompanionProfile } from '../types';
+import { TrendingUp, CheckCircle2, XCircle, Clock, ShieldCheck, ArrowLeft, Sparkles, MapPin, DollarSign, Calendar, AlertTriangle, LogOut, Camera, Plus, Trash2, Image as ImageIcon, UserCheck, Bell, ShieldAlert, Mail, KeyRound, Lock, Eye, Edit3 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { fetchCompanionRequestsFromSupabase, updateBookingStatusInSupabase, updateUserAvatarInSupabase, sendBookingConfirmationEmail, verifyCompletionOtpAndReleasePayout } from '../services/supabase';
+import { fetchCompanionRequestsFromSupabase, updateBookingStatusInSupabase, updateUserAvatarInSupabase, sendBookingConfirmationEmail, verifyCompletionOtpAndReleasePayout, updateCompanionProfileInSupabase } from '../services/supabase';
 import { SeekerProfileModal } from './SeekerProfileModal';
 import { FaceVerificationModal } from './FaceVerificationModal';
+import { CompanionProfileView } from './CompanionProfileView';
 
 interface CompanionDashboardProps {
   userName: string;
@@ -34,6 +35,128 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
   const [kycVerified, setKycVerified] = useState(() => localStorage.getItem('ck_kyc_verified') === 'true');
   const [faceModalOpen, setFaceModalOpen] = useState(false);
   const [activeProfileModal, setActiveProfileModal] = useState<BookingRequest | null>(null);
+
+  // Profile Customization State (matching reference design)
+  const [customBio, setCustomBio] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`ck_companion_custom_profile_${userName}`) || localStorage.getItem('ck_companion_profile_custom');
+      if (saved) return JSON.parse(saved).bio || '';
+      return 'Easygoing, ambitious, and always up for meaningful conversations. I value honesty, kindness, and mutual respect. Looking to connect with someone who enjoys good company, laughter, and building something real together.';
+    } catch {
+      return 'Easygoing, ambitious, and always up for meaningful conversations. I value honesty, kindness, and mutual respect. Looking to connect with someone who enjoys good company, laughter, and building something real together.';
+    }
+  });
+
+  const [customCity, setCustomCity] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`ck_companion_custom_profile_${userName}`) || localStorage.getItem('ck_companion_profile_custom');
+      if (saved && JSON.parse(saved).city) return JSON.parse(saved).city;
+      return localStorage.getItem('ck_user_city') || 'Mumbai';
+    } catch {
+      return 'Mumbai';
+    }
+  });
+
+  const [customPinCode, setCustomPinCode] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`ck_companion_custom_profile_${userName}`) || localStorage.getItem('ck_companion_profile_custom');
+      if (saved && JSON.parse(saved).pinCode) return JSON.parse(saved).pinCode;
+      return localStorage.getItem('ck_user_pincode') || '400050';
+    } catch {
+      return '400050';
+    }
+  });
+
+  const [customHourlyRate] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(`ck_companion_custom_profile_${userName}`) || localStorage.getItem('ck_companion_profile_custom');
+      if (saved && JSON.parse(saved).hourlyRate) return Number(JSON.parse(saved).hourlyRate);
+      return 1999;
+    } catch {
+      return 1999;
+    }
+  });
+
+  const [customHobbies, setCustomHobbies] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(`ck_companion_custom_profile_${userName}`) || localStorage.getItem('ck_companion_profile_custom');
+      if (saved && JSON.parse(saved).hobbies) return JSON.parse(saved).hobbies;
+      return ['Book reading', 'Shopping', 'Movies', 'Pottery'];
+    } catch {
+      return ['Book reading', 'Shopping', 'Movies', 'Pottery'];
+    }
+  });
+
+  const [customServices, setCustomServices] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(`ck_companion_custom_profile_${userName}`) || localStorage.getItem('ck_companion_profile_custom');
+      if (saved && JSON.parse(saved).services) {
+        const raw: string[] = JSON.parse(saved).services;
+        const filtered = raw.filter(
+          (s) => !['medical support', 'elder care', 'general consultation', 'shopping buddy', 'in person meeting', 'movie companion', 'hangingout'].includes(s.toLowerCase().trim())
+        );
+        if (filtered.length > 0) return filtered;
+      }
+      return [
+        'Hangout',
+        'Movie Partner',
+        'Clubbing',
+        'Lunch/Dinner',
+        'Travel Partner',
+        'Coffee Partner',
+      ];
+    } catch {
+      return [
+        'Hangout',
+        'Movie Partner',
+        'Clubbing',
+        'Lunch/Dinner',
+        'Travel Partner',
+        'Coffee Partner',
+      ];
+    }
+  });
+
+  const [customAvailability, setCustomAvailability] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem(`ck_companion_custom_profile_${userName}`) || localStorage.getItem('ck_companion_profile_custom');
+      if (saved && JSON.parse(saved).availability) return JSON.parse(saved).availability;
+      return {
+        Mon: '11:00 – 23:00',
+        Tue: '11:00 – 23:00',
+        Wed: '11:00 – 23:00',
+        Thu: '11:00 – 23:00',
+        Fri: '11:00 – 23:00',
+        Sat: '11:00 – 23:00',
+        Sun: '11:00 – 23:00',
+      };
+    } catch {
+      return {
+        Mon: '11:00 – 23:00',
+        Tue: '11:00 – 23:00',
+        Wed: '11:00 – 23:00',
+        Thu: '11:00 – 23:00',
+        Fri: '11:00 – 23:00',
+        Sat: '11:00 – 23:00',
+        Sun: '11:00 – 23:00',
+      };
+    }
+  });
+
+  const [coverGradient, setCoverGradient] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`ck_companion_custom_profile_${userName}`) || localStorage.getItem('ck_companion_profile_custom');
+      if (saved && JSON.parse(saved).coverGradient) return JSON.parse(saved).coverGradient;
+      return 'bg-gradient-to-r from-[#9333EA] via-[#D946EF] to-[#EC4899]';
+    } catch {
+      return 'bg-gradient-to-r from-[#9333EA] via-[#D946EF] to-[#EC4899]';
+    }
+  });
+
+  const [previewProfileOpen, setPreviewProfileOpen] = useState(false);
+  const [newHobbyInput, setNewHobbyInput] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
 
   // OTP Verification Modal state for completing outings & releasing escrow funds
   const [otpModalBooking, setOtpModalBooking] = useState<BookingRequest | null>(null);
@@ -256,6 +379,99 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
     userAvatar || localStorage.getItem('ck_user_avatar') || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     ...gallery,
   ];
+
+  const handleSaveProfileCustomizations = async () => {
+    setSavingProfile(true);
+    const profileData = {
+      bio: customBio,
+      city: customCity,
+      pinCode: customPinCode,
+      hourlyRate: customHourlyRate,
+      hobbies: customHobbies,
+      services: customServices,
+      availability: customAvailability,
+      coverGradient: coverGradient,
+      avatarUrl: companionPhotos[0],
+      online: isOnline,
+    };
+
+    try {
+      localStorage.setItem(`ck_companion_custom_profile_${userName}`, JSON.stringify(profileData));
+      localStorage.setItem('ck_companion_profile_custom', JSON.stringify(profileData));
+      await updateCompanionProfileInSupabase(userName, profileData);
+
+      setSaveSuccessMsg(true);
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.4 }
+      });
+      setTimeout(() => setSaveSuccessMsg(false), 4000);
+    } catch (err) {
+      console.error('Error saving profile customizations:', err);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleAddHobby = (hobbyToAdd?: string) => {
+    const hobby = (hobbyToAdd || newHobbyInput).trim();
+    if (!hobby) return;
+    if (!customHobbies.includes(hobby)) {
+      setCustomHobbies([...customHobbies, hobby]);
+    }
+    setNewHobbyInput('');
+  };
+
+  const handleRemoveHobby = (hobbyToRemove: string) => {
+    setCustomHobbies(customHobbies.filter(h => h !== hobbyToRemove));
+  };
+
+  const handleToggleService = (serviceName: string) => {
+    if (customServices.includes(serviceName)) {
+      if (customServices.length <= 1) {
+        alert('Please keep at least one service selected.');
+        return;
+      }
+      setCustomServices(customServices.filter(s => s !== serviceName));
+    } else {
+      setCustomServices([...customServices, serviceName]);
+    }
+  };
+
+  const handleUpdateAvailabilityHours = (day: string, hours: string) => {
+    setCustomAvailability(prev => ({
+      ...prev,
+      [day]: hours,
+    }));
+  };
+
+  const previewCompanionData: CompanionProfile = {
+    id: 'comp-preview',
+    name: userName || 'Akshita Bhutra',
+    age: 24,
+    city: customCity,
+    pinCode: customPinCode,
+    rating: 5.00,
+    reviewCount: 2,
+    hourlyRate: customHourlyRate,
+    avatarUrl: companionPhotos[0],
+    badges: ['Face Verified', 'Top Rated Companion', '100% KYC'],
+    bio: customBio,
+    verifiedKYC: kycVerified,
+    online: isOnline,
+    distanceKm: 2.1,
+    languages: ['Hindi', 'English'],
+    services: customServices,
+    hobbies: customHobbies,
+    availability: customAvailability,
+    memberSince: 'Jun 2026',
+    reviewsList: [
+      { rating: 5, date: '8/8/2026', comment: 'Awesome' },
+      { rating: 5, date: '8/4/2026', comment: '' },
+    ],
+    coverGradient: coverGradient,
+  };
 
   return (
     <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 relative">
@@ -533,7 +749,292 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
           )}
         </div>
 
-        {/* 2. INCOMING SEEKER REQUESTS (MAIN WORKFLOW) */}
+        {/* 2. MY PUBLIC PROFILE CUSTOMIZATION (ABOUT, HOBBIES, SERVICES, AVAILABILITY) */}
+        <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border border-pink-200 shadow-apple-md mb-8 text-left">
+          
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 mb-6 border-b border-pink-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-[#9333EA]" />
+                <h2 className="text-xl font-bold text-[#1d1d1f]">
+                  My Public Profile &amp; Customization
+                </h2>
+                <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-0.5 rounded-full">
+                  Live Seeker View
+                </span>
+              </div>
+              <p className="text-xs text-[#86868b] mt-0.5">
+                Customize your bio, hobbies, available services, and weekly schedule seen by seekers.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setPreviewProfileOpen(true)}
+                className="px-4 py-2.5 rounded-xl border border-purple-200 hover:bg-purple-50 text-purple-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Preview My Profile</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveProfileCustomizations}
+                disabled={savingProfile}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#9333EA] via-[#D946EF] to-[#E11D48] hover:opacity-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-pink-500/20 active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{savingProfile ? 'Saving...' : 'Save Profile Changes'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Success Banner */}
+          {saveSuccessMsg && (
+            <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Your profile customizations have been saved successfully! Seekers now see your updated details live.</span>
+            </div>
+          )}
+
+          <div className="space-y-6">
+
+            {/* 1. About Me (Bio) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-[#1d1d1f] flex items-center justify-between">
+                <span>About Me &amp; Personality Bio</span>
+                <span className="text-[11px] font-normal text-stone-500">{customBio.length} characters</span>
+              </label>
+              <textarea
+                rows={3}
+                value={customBio}
+                onChange={(e) => setCustomBio(e.target.value)}
+                placeholder="Easygoing, ambitious, and always up for meaningful conversations. I value honesty, kindness, and mutual respect. Looking to connect with someone who enjoys good company, laughter, and building something real together."
+                className="w-full p-3.5 rounded-2xl border border-stone-200 focus:border-[#9333EA] outline-none text-xs sm:text-sm text-[#1d1d1f] transition leading-relaxed"
+              />
+              <p className="text-[11px] text-stone-500">
+                This appears directly in the "About" card on your companion profile.
+              </p>
+            </div>
+
+            {/* 2. Hobbies & Interests */}
+            <div className="space-y-3 pt-2 border-t border-stone-100">
+              <label className="text-xs font-bold text-[#1d1d1f] block">
+                Hobbies &amp; Interests (Pill Badges)
+              </label>
+
+              {/* Current tags */}
+              <div className="flex flex-wrap gap-2">
+                {customHobbies.map((hobby) => (
+                  <span
+                    key={hobby}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#FAF5FF] text-[#7E22CE] border border-[#E9D5FF] text-xs font-semibold shadow-2xs"
+                  >
+                    <span>{hobby}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveHobby(hobby)}
+                      className="w-4 h-4 rounded-full hover:bg-purple-200/70 text-purple-700 flex items-center justify-center transition cursor-pointer text-xs"
+                      title="Remove tag"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                ))}
+              </div>
+
+              {/* Add custom tag input */}
+              <div className="flex items-center gap-2 max-w-md">
+                <input
+                  type="text"
+                  value={newHobbyInput}
+                  onChange={(e) => setNewHobbyInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddHobby();
+                    }
+                  }}
+                  placeholder="Type a hobby & press Enter (e.g. Photography)"
+                  className="flex-1 px-3.5 py-2 rounded-xl border border-stone-200 focus:border-[#9333EA] outline-none text-xs text-[#1d1d1f]"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAddHobby()}
+                  className="px-4 py-2 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-800 text-xs font-bold transition cursor-pointer"
+                >
+                  + Add
+                </button>
+              </div>
+
+              {/* Quick suggestions */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="text-stone-400 text-[11px] mr-1">Quick Add:</span>
+                {['Book reading', 'Shopping', 'Movies', 'Pottery', 'Art & Cafes', 'Fitness', 'Live Music', 'Travel', 'Fine Dining'].map((sug) => {
+                  const alreadyAdded = customHobbies.includes(sug);
+                  return (
+                    <button
+                      key={sug}
+                      type="button"
+                      disabled={alreadyAdded}
+                      onClick={() => handleAddHobby(sug)}
+                      className={`text-[11px] px-2.5 py-1 rounded-full border transition cursor-pointer ${
+                        alreadyAdded
+                          ? 'bg-stone-100 text-stone-400 border-stone-200 cursor-not-allowed'
+                          : 'bg-white hover:bg-purple-50 text-stone-600 border-stone-200'
+                      }`}
+                    >
+                      + {sug}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 3. Services Offered (Checklist) */}
+            <div className="space-y-3 pt-2 border-t border-stone-100">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[#1d1d1f] block">
+                  Official Click Karo Date Karo Services ({customServices.length}/6 enabled)
+                </label>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  Platform Verified
+                </span>
+              </div>
+              <p className="text-[11px] text-stone-500">
+                Select which official companion services you accept bookings for from clients.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {[
+                  { name: 'Hangout', desc: '4 Hours Outing' },
+                  { name: 'Movie Partner', desc: '4 Hours Blockbuster' },
+                  { name: 'Clubbing', desc: '6 Hours Nightlife' },
+                  { name: 'Lunch/Dinner', desc: '2 Hours Fine Dining' },
+                  { name: 'Travel Partner', desc: '12 Hours Full Day' },
+                  { name: 'Coffee Partner', desc: '1 Hour Cafe Dialogue' },
+                ].map((srv) => {
+                  const isChecked = customServices.includes(srv.name);
+                  return (
+                    <div
+                      key={srv.name}
+                      onClick={() => handleToggleService(srv.name)}
+                      className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition select-none ${
+                        isChecked
+                          ? 'bg-purple-50/70 border-purple-300 text-purple-900 font-bold shadow-2xs'
+                          : 'bg-stone-50/60 border-stone-200 text-stone-500 font-medium hover:border-stone-300'
+                      }`}
+                    >
+                      <div>
+                        <p className="text-xs font-bold">{srv.name}</p>
+                        <p className="text-[10px] text-stone-400 font-normal">{srv.desc}</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {}}
+                        className="w-4 h-4 text-purple-600 rounded-md focus:ring-purple-500 pointer-events-none accent-purple-600"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 4. Weekly Availability Schedule */}
+            <div className="space-y-3 pt-2 border-t border-stone-100">
+              <label className="text-xs font-bold text-[#1d1d1f] block">
+                Weekly Availability Schedule
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
+                  const currentSlot = customAvailability[day] || '11:00 – 23:00';
+                  return (
+                    <div key={day} className="p-2.5 rounded-xl border border-stone-200 bg-stone-50/50 space-y-1">
+                      <span className="text-xs font-extrabold text-[#1d1d1f] block">{day}</span>
+                      <input
+                        type="text"
+                        value={currentSlot}
+                        onChange={(e) => handleUpdateAvailabilityHours(day, e.target.value)}
+                        placeholder="11:00 – 23:00"
+                        className="w-full text-[11px] p-1.5 rounded-lg border border-stone-200 bg-white text-stone-700 font-mono text-center outline-none focus:border-[#9333EA]"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 5. City, PIN Code & Banner Theme */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-stone-100 text-xs">
+              <div>
+                <label className="font-bold text-[#1d1d1f] block mb-1">Serving City</label>
+                <input
+                  type="text"
+                  value={customCity}
+                  onChange={(e) => setCustomCity(e.target.value)}
+                  placeholder="e.g. Mumbai"
+                  className="w-full p-2.5 rounded-xl border border-stone-200 focus:border-[#9333EA] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-[#1d1d1f] block mb-1">PIN Code</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={customPinCode}
+                  onChange={(e) => setCustomPinCode(e.target.value)}
+                  placeholder="e.g. 400050"
+                  className="w-full p-2.5 rounded-xl border border-stone-200 focus:border-[#9333EA] outline-none font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-[#1d1d1f] block mb-1">Cover Banner Theme</label>
+                <div className="flex items-center gap-2 pt-1">
+                  {[
+                    { id: 'bg-gradient-to-r from-[#9333EA] via-[#D946EF] to-[#EC4899]', label: 'Signature Magenta' },
+                    { id: 'bg-gradient-to-r from-purple-800 via-indigo-700 to-blue-600', label: 'Royal Violet' },
+                    { id: 'bg-gradient-to-r from-rose-500 via-pink-500 to-amber-400', label: 'Sunset Coral' },
+                    { id: 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600', label: 'Emerald Luxe' },
+                  ].map((theme) => (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      onClick={() => setCoverGradient(theme.id)}
+                      title={theme.label}
+                      className={`w-7 h-7 rounded-full ${theme.id} transition-transform ${
+                        coverGradient === theme.id ? 'ring-3 ring-[#9333EA] scale-110' : 'opacity-70 hover:opacity-100'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Bottom Save Bar */}
+          <div className="mt-6 pt-4 border-t border-pink-100 flex items-center justify-between">
+            <p className="text-[11px] text-stone-500">
+              Changes sync directly to your companion listing and seeker browsing view.
+            </p>
+            <button
+              type="button"
+              onClick={handleSaveProfileCustomizations}
+              disabled={savingProfile}
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#9333EA] via-[#D946EF] to-[#E11D48] hover:opacity-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-pink-500/20 active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{savingProfile ? 'Saving...' : 'Save Profile Changes'}</span>
+            </button>
+          </div>
+
+        </div>
+
+        {/* 3. INCOMING SEEKER REQUESTS (MAIN WORKFLOW) */}
         <div className="bg-white/85 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border border-pink-200 shadow-apple-lg mb-8">
           
           <div className="flex items-center justify-between pb-4 mb-6 border-b border-pink-100">
@@ -914,6 +1415,35 @@ export const CompanionDashboard: React.FC<CompanionDashboardProps> = ({
               >
                 Done
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* 5. PREVIEW PUBLIC PROFILE MODAL (EXACT MATCH TO SEEKER VIEW) */}
+        {previewProfileOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-xs animate-fade-in overflow-y-auto">
+            <div className="bg-[#fbfbfb] rounded-3xl max-w-5xl w-full p-4 sm:p-8 max-h-[95vh] overflow-y-auto shadow-2xl relative border border-purple-200">
+              <div className="mb-4 flex items-center justify-between pb-3 border-b border-stone-200">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <h3 className="font-bold text-sm sm:text-base text-stone-900">
+                    Live Public Profile Preview (How Seekers See You)
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewProfileOpen(false)}
+                  className="px-4 py-1.5 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold transition cursor-pointer"
+                >
+                  Close Preview
+                </button>
+              </div>
+
+              <CompanionProfileView
+                companion={previewCompanionData}
+                onBack={() => setPreviewProfileOpen(false)}
+                isSeeker={false}
+              />
             </div>
           </div>
         )}
